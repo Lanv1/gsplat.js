@@ -11,7 +11,8 @@
     "build": "npm run build:wasm && rollup -c && npm run copy:wasm",
     "test": "jest --passWithNoTests",
     "lint": "eslint \"src/**/*.ts\" \"examples/**/*.ts\"",
-    "format": "prettier --write \"src/**/*.ts\" \"examples/**/*.ts\""
+    "format": "prettier --write \"src/**/*.ts\" \"examples/**/*.ts\"",
+    "prepare": "npm run build"
   },
   "repository": {
     "type": "git",
