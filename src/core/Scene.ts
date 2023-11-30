@@ -13,13 +13,16 @@ class Scene extends EventDispatcher {
     private _positions: Float32Array;
     private _rotations: Float32Array;
     private _scales: Float32Array;
+    private _shs: Float32Array;
 
-    setData: (data: Uint8Array) => void;
+    setData: (data: Uint8Array, shs?: Float32Array) => void;
     translate: (translation: Vector3) => void;
     rotate: (rotation: Quaternion) => void;
     scale: (scale: Vector3) => void;
     limitBox: (xMin: number, xMax: number, yMin: number, yMax: number, zMin: number, zMax: number) => void;
     saveToFile: (name: string) => void;
+
+    updateColor: (camPos: Vector3) => void;
 
     constructor() {
         super();
@@ -69,14 +72,19 @@ class Scene extends EventDispatcher {
         this._positions = new Float32Array(0);
         this._rotations = new Float32Array(0);
         this._scales = new Float32Array(0);
+        this._shs = new Float32Array(0);
 
-        this.setData = (data: Uint8Array) => {
+        this.setData = (data: Uint8Array, shs?: Float32Array) => {
             this._vertexCount = data.length / Scene.RowLength;
             this._height = Math.ceil((2 * this._vertexCount) / this._width);
             this._data = new Uint32Array(this._width * this._height * 4);
             this._positions = new Float32Array(3 * this._vertexCount);
             this._rotations = new Float32Array(4 * this._vertexCount);
             this._scales = new Float32Array(3 * this._vertexCount);
+
+            if(typeof shs != 'undefined') {
+                this._shs = shs;
+            }
 
             const f_buffer = new Float32Array(data.buffer);
             const u_buffer = new Uint8Array(data.buffer);
@@ -361,6 +369,14 @@ class Scene extends EventDispatcher {
             link.href = URL.createObjectURL(blob);
             link.click();
         };
+
+        this.updateColor = (camPos: Vector3) => {
+            /*
+                For each gaussian, update the color in scene.data buffer
+                using spherical harmonics coefficients if provided
+            */
+
+        } 
     }
 
     get data() {
