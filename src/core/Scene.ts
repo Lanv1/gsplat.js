@@ -74,23 +74,16 @@ class Scene extends EventDispatcher {
         this._scales = new Float32Array(0);
         this._shs = new Float32Array(0);
 
-        //TODO: function to fill shs coefficients in the texture at the right place (stride of 32 bytes)
-        // the 32 first bytes are for vec4f pos and vec3f cov + f color
         this.setData = (data: Uint8Array, shs?: Float32Array) => {
-            const useShs : boolean = typeof shs != 'undefined';
-            const totalPixels : number = useShs ? 32 * this._vertexCount : 2 * this._vertexCount;
-
             this._vertexCount = data.length / Scene.RowLength;
-            this._height = Math.ceil(totalPixels / this._width);
+            this._height = Math.ceil((2 * this._vertexCount) / this._width);
             this._data = new Uint32Array(this._width * this._height * 4);
             this._positions = new Float32Array(3 * this._vertexCount);
             this._rotations = new Float32Array(4 * this._vertexCount);
             this._scales = new Float32Array(3 * this._vertexCount);
-            
-            let stride = 8;
-            if(useShs) {
-                this._shs = shs as Float32Array;
-                stride += 48;
+
+            if(typeof shs != 'undefined') {
+                this._shs = shs;
             }
 
             const f_buffer = new Float32Array(data.buffer);
@@ -112,15 +105,15 @@ class Scene extends EventDispatcher {
                 this._scales[3 * i + 0] = f_buffer[8 * i + 3 + 0];
                 this._scales[3 * i + 1] = f_buffer[8 * i + 3 + 1];
                 this._scales[3 * i + 2] = f_buffer[8 * i + 3 + 2];
-                
-                data_f[stride * i + 0] = this._positions[3 * i + 0];
-                data_f[stride * i + 1] = this._positions[3 * i + 1];
-                data_f[stride * i + 2] = this._positions[3 * i + 2];
 
-                data_c[4 * (stride * i + 7) + 0] = u_buffer[32 * i + 24 + 0];
-                data_c[4 * (stride * i + 7) + 1] = u_buffer[32 * i + 24 + 1];
-                data_c[4 * (stride * i + 7) + 2] = u_buffer[32 * i + 24 + 2];
-                data_c[4 * (stride * i + 7) + 3] = u_buffer[32 * i + 24 + 3];
+                data_f[8 * i + 0] = this._positions[3 * i + 0];
+                data_f[8 * i + 1] = this._positions[3 * i + 1];
+                data_f[8 * i + 2] = this._positions[3 * i + 2];
+
+                data_c[4 * (8 * i + 7) + 0] = u_buffer[32 * i + 24 + 0];
+                data_c[4 * (8 * i + 7) + 1] = u_buffer[32 * i + 24 + 1];
+                data_c[4 * (8 * i + 7) + 2] = u_buffer[32 * i + 24 + 2];
+                data_c[4 * (8 * i + 7) + 3] = u_buffer[32 * i + 24 + 3];
 
                 const rot = Matrix3.RotationFromQuaternion(
                     new Quaternion(
@@ -146,9 +139,9 @@ class Scene extends EventDispatcher {
                     M[2] * M[2] + M[5] * M[5] + M[8] * M[8],
                 ];
 
-                this._data[stride * i + 4] = packHalf2x16(4 * sigma[0], 4 * sigma[1]);
-                this._data[stride * i + 5] = packHalf2x16(4 * sigma[2], 4 * sigma[3]);
-                this._data[stride * i + 6] = packHalf2x16(4 * sigma[4], 4 * sigma[5]);
+                this._data[8 * i + 4] = packHalf2x16(4 * sigma[0], 4 * sigma[1]);
+                this._data[8 * i + 5] = packHalf2x16(4 * sigma[2], 4 * sigma[3]);
+                this._data[8 * i + 6] = packHalf2x16(4 * sigma[4], 4 * sigma[5]);
             }
 
             this.dispatchEvent(changeEvent);
