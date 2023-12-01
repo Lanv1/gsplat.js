@@ -17,7 +17,7 @@ export class WebGLRenderer {
     render: (scene: Scene, camera: Camera) => void;
     dispose: () => void;
 
-    constructor(optionalCanvas: HTMLCanvasElement | null = null, optionalShaderPasses: ShaderPass[] | null = null, useShs = false) {
+    constructor(useShs: boolean = false, optionalCanvas: HTMLCanvasElement | null = null, optionalShaderPasses: ShaderPass[] | null = null) {
         const canvas: HTMLCanvasElement = optionalCanvas || document.createElement("canvas");
         if (!optionalCanvas) {
             canvas.style.display = "block";
