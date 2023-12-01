@@ -54,6 +54,8 @@ export class WebGLRenderer {
         let u_view: WebGLUniformLocation;
         let u_texture: WebGLUniformLocation;
 
+        let u_useShs: WebGLUniformLocation;
+
         let positionAttribute: number;
         let indexAttribute: number;
 
@@ -140,6 +142,9 @@ export class WebGLRenderer {
 
             u_view = gl.getUniformLocation(program, "view") as WebGLUniformLocation;
             gl.uniformMatrix4fv(u_view, false, activeCamera.viewMatrix.buffer);
+
+            u_useShs = gl.getUniformLocation(program, "u_useShs") as WebGLUniformLocation;
+            gl.uniform1i(u_useShs, 0); //set useShs uniform if shs should be used to compute the color.
 
             const triangleVertices = new Float32Array([-2, -2, 2, -2, 2, 2, -2, 2]);
             vertexBuffer = gl.createBuffer() as WebGLBuffer;

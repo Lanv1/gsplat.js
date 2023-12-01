@@ -13,6 +13,7 @@ uniform vec2 viewport;
 
 uniform bool u_useDepthFade;
 uniform float u_depthFade;
+uniform bool u_useShs;
 
 in vec2 position;
 in int index;
@@ -21,7 +22,14 @@ out vec4 vColor;
 out vec2 vPosition;
 
 void main () {
-    uvec4 cen = texelFetch(u_texture, ivec2((uint(index) & 0x3ffu) << 1, uint(index) >> 10), 0);
+    uvec4 cen(0);
+    cen = texelFetch(u_texture, ivec2((uint(index) & 0x3ffu) << 1, uint(index) >> 10), 0);
+
+    // if uses shs: only 64 (instead of 1024) vert data per row of the texture
+    // first 32 bytes are for pos + cov + color + padding
+    if(u_useShs)
+        cen = texelFetch(u_texture, ivec2((uint(index) & 0x3fu) << 5, uint(index) >> 6), 0); 
+    
     vec4 cam = view * vec4(uintBitsToFloat(cen.xyz), 1);
     vec4 pos2d = projection * cam;
 
@@ -30,12 +38,19 @@ void main () {
         gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
         return;
     }
-
-
-    uvec4 cov = texelFetch(u_texture, ivec2(((uint(index) & 0x3ffu) << 1) | 1u, uint(index) >> 10), 0);
+    
+    uvec4 cov(0);
+    cov = texelFetch(u_texture, ivec2(((uint(index) & 0x3ffu) << 1) | 1u, uint(index) >> 10), 0);
+    
+    //cov + col (16 bytes) stored next to the first 16 bytes
+    if(u_useShs)
+        cov = texelFetch(u_texture, ivec2(((uint(index) & 0x3fu) << 5) | 0x10u, uint(index) >> 6), 0);
+    
+    //TODO: compute color from the 16x4 float spherical harmonics coefficients stored
+     
     vec2 u1 = unpackHalf2x16(cov.x), u2 = unpackHalf2x16(cov.y), u3 = unpackHalf2x16(cov.z);
     mat3 Vrk = mat3(u1.x, u1.y, u2.x, u1.y, u2.y, u3.x, u2.x, u3.x, u3.y);
-
+    
     mat3 J = mat3(
         focal.x / cam.z, 0., -(focal.x * cam.x) / (cam.z * cam.z), 
         0., -focal.y / cam.z, (focal.y * cam.y) / (cam.z * cam.z), 
