@@ -22,7 +22,7 @@ out vec4 vColor;
 out vec2 vPosition;
 
 void main () {
-    uvec4 cen(0);
+    uvec4 cen;
     cen = texelFetch(u_texture, ivec2((uint(index) & 0x3ffu) << 1, uint(index) >> 10), 0);
 
     // if uses shs: only 64 (instead of 1024) vert data per row of the texture
@@ -39,7 +39,7 @@ void main () {
         return;
     }
     
-    uvec4 cov(0);
+    uvec4 cov;
     cov = texelFetch(u_texture, ivec2(((uint(index) & 0x3ffu) << 1) | 1u, uint(index) >> 10), 0);
     
     //cov + col (16 bytes) stored next to the first 16 bytes
