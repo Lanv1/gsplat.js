@@ -384,8 +384,8 @@ class Scene extends EventDispatcher {
             for(let i = 0; i < nbG; i ++) {
                 let dir = new Vector3(
                     this.positions[i*3] - camPos.x,
-                    this.positions[i*3] - camPos.y,
-                    this.positions[i*3] - camPos.z
+                    this.positions[i*3+1] - camPos.y,
+                    this.positions[i*3+2] - camPos.z
                 );
 
                 dir = dir.normalize();
@@ -396,9 +396,8 @@ class Scene extends EventDispatcher {
                 //Setting sh max degree at each gaussian (3 here)
                 degs[i] = 3;
             }
-
-            const newColors = eval_sh(degs, this._shs, dirs);
-
+            
+            const newColors = eval_sh(degs, this._shs, dirs);    
             const data_c = new Uint8Array(this._data.buffer);
             let c_index = 0; 
 

@@ -196,6 +196,7 @@ export class WebGLRenderer {
             gl.enableVertexAttribArray(positionAttribute);
             gl.vertexAttribPointer(positionAttribute, 2, gl.FLOAT, false, 0, 0);
 
+            texture = initTexture();
             // const texture = gl.createTexture();
             // gl.bindTexture(gl.TEXTURE_2D, texture);
 
@@ -209,7 +210,6 @@ export class WebGLRenderer {
             gl.vertexAttribIPointer(indexAttribute, 1, gl.INT, 0, 0);
             gl.vertexAttribDivisor(indexAttribute, 1);
 
-            texture = initTexture();
             // gl.bindTexture(gl.TEXTURE_2D, texture);
             // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
             // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
@@ -274,12 +274,14 @@ export class WebGLRenderer {
             activeCamera.update(canvas.width, canvas.height);            
             worker.postMessage({ viewProj: activeCamera.viewProj });
             
-            if(this.useShs) {
-                activeScene.updateColor(activeCamera.position);
-                updateTexture();
-            }
             
             if (activeScene.vertexCount > 0) {
+                
+                if(this.useShs) {
+                    activeScene.updateColor(activeCamera.position);
+                    updateTexture();
+                }
+
                 for (const shaderPass of shaderPasses) {
                     shaderPass.render();
                 }

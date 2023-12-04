@@ -1,13 +1,13 @@
 
-const C0 = 0.28209479177387814
-const C1 = 0.4886025119029199
+const C0 = 0.28209479177387814;
+const C1 = 0.4886025119029199;
 const C2 = [
     1.0925484305920792,
     -1.0925484305920792,
     0.31539156525252005,
     -1.0925484305920792,
     0.5462742152960396
-]
+];
 
 const C3 = [
     -0.5900435899266435,
@@ -17,7 +17,7 @@ const C3 = [
     -0.4570457994644658,
     1.445305721320277,
     -0.5900435899266435
-]
+];
 const C4 = [
     2.5033429417967046,
     -1.7701307697799304,
@@ -28,8 +28,11 @@ const C4 = [
     0.47308734787878004,
     -1.7701307697799304,
     0.6258357354491761,
-]   
+];   
 
+function clamp_min(n : number, min: number) {
+    if(n < min) n = min;
+}
 
 function eval_sh(degs: Uint8Array, sh: Float32Array, dirs: Float32Array): Uint8Array {
     // Evaluate spherical harmonics at unit directions
@@ -42,16 +45,13 @@ function eval_sh(degs: Uint8Array, sh: Float32Array, dirs: Float32Array): Uint8A
     //     Uint8Array of colors: size = G * 3 
     
     const nbG = degs.length;
-    let result = new Uint8Array(nbG);
-
+    let result = new Uint8Array(3*nbG);
+    
     for(let i = 0; i < nbG; i ++) {
         const deg = degs[i];
         const shLength = 3 * ((deg+1) ** 2);
-
-        result[i*3] = C0 * sh[i*shLength];
-        result[i*3 + 1] = C0 * sh[i*shLength + 1];
-        result[i*3 + 2] = C0 * sh[i*shLength + 2];
-
+        let r = C0 * sh[i*shLength], g = C0 * sh[i*shLength + 1], b = C0 * sh[i*shLength + 2];
+         
         if(deg > 0) {
             const x = dirs[i*3], y = dirs[i*3 + 1], z = dirs[i*3 + 2]; 
 
@@ -72,10 +72,11 @@ function eval_sh(degs: Uint8Array, sh: Float32Array, dirs: Float32Array): Uint8A
                 C1 * x * sh[i*shLength+10],
                 C1 * x * sh[i*shLength+11]
             ];
-            
-            result[i*3] -= C1_0[0] + C1_1[0] - C1_2[0]; 
-            result[i*3+1] -= C1_0[1] + C1_1[1]- C1_2[1];
-            result[i*3+2] -= C1_0[2] + C1_1[2]- C1_2[2];
+
+            r -= C1_0[0] + C1_1[0] - C1_2[0]; 
+            g -= C1_0[1] + C1_1[1]- C1_2[1];
+            b -= C1_0[2] + C1_1[2]- C1_2[2];
+
             
             if(deg > 1) {
                 const xx = x*x, xy = x*y, yz = y*z, xz = x*z, yy = y*y, zz = z*z;
@@ -110,9 +111,9 @@ function eval_sh(degs: Uint8Array, sh: Float32Array, dirs: Float32Array): Uint8A
                     C2[4] * (xx - yy) * sh[i*shLength+26]
                 ];
 
-                result[i*3] += C2_0[0] + C2_1[0] + C2_2[0] + C2_3[0] + C2_4[0]; 
-                result[i*3+1] += C2_0[1] + C2_1[1] + C2_2[1]+ C2_3[1] + C2_4[1];
-                result[i*3+2] += C2_0[2] + C2_1[2] + C2_2[2]+ C2_3[2] + C2_4[2];
+                r += C2_0[0] + C2_1[0] + C2_2[0] + C2_3[0] + C2_4[0]; 
+                g += C2_0[1] + C2_1[1] + C2_2[1]+ C2_3[1] + C2_4[1];
+                b += C2_0[2] + C2_1[2] + C2_2[2]+ C2_3[2] + C2_4[2];
 
                 if(deg > 2) {
                     const C3_0 = [
@@ -146,25 +147,33 @@ function eval_sh(degs: Uint8Array, sh: Float32Array, dirs: Float32Array): Uint8A
                     ];
 
                     const C3_5 = [
-                        C3[2] * z * (xx - yy) * sh[i*shLength+42],
-                        C3[2] * z * (xx - yy) * sh[i*shLength+43],
-                        C3[2] * z * (xx - yy) * sh[i*shLength+44]
+                        C3[5] * z * (xx - yy) * sh[i*shLength+42],
+                        C3[5] * z * (xx - yy) * sh[i*shLength+43],
+                        C3[5] * z * (xx - yy) * sh[i*shLength+44]
                     ];
                     
                     const C3_6 = [
-                        C3[3] * x * (xx - 3 * yy) * sh[i*shLength+45],
-                        C3[3] * x * (xx - 3 * yy) * sh[i*shLength+46],
-                        C3[3] * x * (xx - 3 * yy) * sh[i*shLength+47]
+                        C3[6] * x * (xx - 3 * yy) * sh[i*shLength+45],
+                        C3[6] * x * (xx - 3 * yy) * sh[i*shLength+46],
+                        C3[6] * x * (xx - 3 * yy) * sh[i*shLength+47]
                     ];
 
-                    result[i*3] += C3_0[0] + C3_1[0] + C3_2[0] + C3_3[0] + C3_4[0] + C3_5[0] + C3_6[0]; 
-                    result[i*3] += C3_0[1] + C3_1[1] + C3_2[1] + C3_3[1] + C3_4[1] + C3_5[1] + C3_6[1]; 
-                    result[i*3] += C3_0[2] + C3_1[2] + C3_2[2] + C3_3[2] + C3_4[2] + C3_5[2] + C3_6[2]; 
+                    r +=  C3_0[0] + C3_1[0] + C3_2[0] + C3_3[0] + C3_4[0] + C3_5[0] + C3_6[0]; 
+                    g +=  C3_0[1] + C3_1[1] + C3_2[1] + C3_3[1] + C3_4[1] + C3_5[1] + C3_6[1]; 
+                    b += C3_0[2] + C3_1[2] + C3_2[2] + C3_3[2] + C3_4[2] + C3_5[2] + C3_6[2]; 
                 }
             }
         }
-    }
 
+        clamp_min(r, 0);
+        clamp_min(g, 0);
+        clamp_min(b, 0);
+
+        result[3*i] = (r+0.5)*255;
+        result[3*i+1] = (g+0.5)*255;
+        result[3*i+2] = (b+0.5)*255;
+
+    }
     return result;
 } 
 
