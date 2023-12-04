@@ -12,12 +12,14 @@ export class WebGLRenderer {
     domElement: HTMLCanvasElement;
     gl: WebGL2RenderingContext;
 
+    useShs: boolean;
     resize: () => void;
     setSize: (width: number, height: number) => void;
     render: (scene: Scene, camera: Camera) => void;
     dispose: () => void;
+    
 
-    constructor(optionalCanvas: HTMLCanvasElement | null = null, optionalShaderPasses: ShaderPass[] | null = null) {
+    constructor(_useShs = false, optionalCanvas: HTMLCanvasElement | null = null, optionalShaderPasses: ShaderPass[] | null = null) {
         const canvas: HTMLCanvasElement = optionalCanvas || document.createElement("canvas");
         if (!optionalCanvas) {
             canvas.style.display = "block";
@@ -28,6 +30,7 @@ export class WebGLRenderer {
             canvas.style.padding = "0";
             document.body.appendChild(canvas);
         }
+        this.useShs = _useShs;
         canvas.style.background = "#000";
         this.domElement = canvas;
 
@@ -47,6 +50,8 @@ export class WebGLRenderer {
         let vertexShader: WebGLShader;
         let fragmentShader: WebGLShader;
         let program: WebGLProgram;
+
+        let texture: WebGLTexture;
 
         let u_projection: WebGLUniformLocation;
         let u_viewport: WebGLUniformLocation;
@@ -87,6 +92,47 @@ export class WebGLRenderer {
 
             u_viewport = gl.getUniformLocation(program, "viewport") as WebGLUniformLocation;
             gl.uniform2fv(u_viewport, new Float32Array([canvas.width, canvas.height]));
+        };
+
+
+        const initTexture = () : WebGLTexture => {
+            const texture = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+            
+            gl.texImage2D(
+                gl.TEXTURE_2D,
+                0,
+                gl.RGBA32UI,
+                activeScene.width,
+                activeScene.height,
+                0,
+                gl.RGBA_INTEGER,
+                gl.UNSIGNED_INT,
+                activeScene.data,
+            );
+            gl.activeTexture(gl.TEXTURE0);
+
+            return texture as WebGLTexture;
+        };
+
+        const updateTexture = () => {
+            gl.bindTexture(gl.TEXTURE_2D, texture);            
+            gl.texImage2D(
+                gl.TEXTURE_2D,
+                0,
+                gl.RGBA32UI,
+                activeScene.width,
+                activeScene.height,
+                0,
+                gl.RGBA_INTEGER,
+                gl.UNSIGNED_INT,
+                activeScene.data,
+            );
         };
 
         const initWebGL = () => {
@@ -150,8 +196,8 @@ export class WebGLRenderer {
             gl.enableVertexAttribArray(positionAttribute);
             gl.vertexAttribPointer(positionAttribute, 2, gl.FLOAT, false, 0, 0);
 
-            const texture = gl.createTexture();
-            gl.bindTexture(gl.TEXTURE_2D, texture);
+            // const texture = gl.createTexture();
+            // gl.bindTexture(gl.TEXTURE_2D, texture);
 
             u_texture = gl.getUniformLocation(program, "u_texture") as WebGLUniformLocation;
             gl.uniform1i(u_texture, 0);
@@ -163,23 +209,24 @@ export class WebGLRenderer {
             gl.vertexAttribIPointer(indexAttribute, 1, gl.INT, 0, 0);
             gl.vertexAttribDivisor(indexAttribute, 1);
 
-            gl.bindTexture(gl.TEXTURE_2D, texture);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-            gl.texImage2D(
-                gl.TEXTURE_2D,
-                0,
-                gl.RGBA32UI,
-                activeScene.width,
-                activeScene.height,
-                0,
-                gl.RGBA_INTEGER,
-                gl.UNSIGNED_INT,
-                activeScene.data,
-            );
-            gl.activeTexture(gl.TEXTURE0);
+            texture = initTexture();
+            // gl.bindTexture(gl.TEXTURE_2D, texture);
+            // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+            // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+            // gl.texImage2D(
+            //     gl.TEXTURE_2D,
+            //     0,
+            //     gl.RGBA32UI,
+            //     activeScene.width,
+            //     activeScene.height,
+            //     0,
+            //     gl.RGBA_INTEGER,
+            //     gl.UNSIGNED_INT,
+            //     activeScene.data,
+            // );
+            // gl.activeTexture(gl.TEXTURE0);
             gl.bindTexture(gl.TEXTURE_2D, texture);
 
             for (const shaderPass of shaderPasses) {
@@ -224,9 +271,14 @@ export class WebGLRenderer {
                 initWebGL();
             }
 
-            activeCamera.update(canvas.width, canvas.height);
+            activeCamera.update(canvas.width, canvas.height);            
             worker.postMessage({ viewProj: activeCamera.viewProj });
-
+            
+            if(this.useShs) {
+                activeScene.updateColor(activeCamera.position);
+                updateTexture();
+            }
+            
             if (activeScene.vertexCount > 0) {
                 for (const shaderPass of shaderPasses) {
                     shaderPass.render();
@@ -253,6 +305,8 @@ export class WebGLRenderer {
             gl.deleteBuffer(colorBuffer);
             gl.deleteBuffer(covABuffer);
             gl.deleteBuffer(covBBuffer);
+
+            gl.deleteTexture(texture);
 
             initialized = false;
         };
