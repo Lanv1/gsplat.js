@@ -1,4 +1,4 @@
-import * as SPLAT from "gsplat";
+import * as SPLAT from "../../../dist/index";
 
 const renderer = new SPLAT.WebGLRenderer();
 const scene = new SPLAT.Scene();
@@ -25,6 +25,7 @@ async function selectFile(file: File) {
                 console.log("Loading PLY file: " + progress);
             },
             format,
+            true
         );
     }
     loading = false;
@@ -32,8 +33,8 @@ async function selectFile(file: File) {
 
 async function main() {
     // Load a placeholder scene
-    const url = "https://huggingface.co/datasets/dylanebert/3dgs/resolve/main/bonsai/bonsai-7k.splat";
-    await SPLAT.Loader.LoadAsync(url, scene, () => {});
+    // const url = "https://huggingface.co/datasets/dylanebert/3dgs/resolve/main/bonsai/bonsai-7k.splat";
+    // await SPLAT.Loader.LoadAsync(url, scene, () => {});
 
     // Render loop
     const frame = () => {
