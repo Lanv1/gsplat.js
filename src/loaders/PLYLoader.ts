@@ -68,7 +68,6 @@ class PLYLoader {
                 const rawData = this._ParseFullPLYBuffer(e.target!.result as ArrayBuffer, format);
                 const data = new Uint8Array(rawData[0]);
                 const shData = new Float32Array(rawData[1]);
-                console.log("file loaded, now setting data.")
 
                 scene.setData(data, shData);
             } else {

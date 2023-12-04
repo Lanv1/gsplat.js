@@ -1,6 +1,6 @@
-import * as SPLAT from "../../../dist/index";
+import * as SPLAT from "gsplat";
 
-const renderer = new SPLAT.WebGLRenderer(true);
+const renderer = new SPLAT.WebGLRenderer();
 const scene = new SPLAT.Scene();
 const camera = new SPLAT.Camera();
 const controls = new SPLAT.OrbitControls(camera, renderer.domElement);
@@ -25,7 +25,6 @@ async function selectFile(file: File) {
                 console.log("Loading PLY file: " + progress);
             },
             format,
-            true
         );
     }
     loading = false;
@@ -33,8 +32,8 @@ async function selectFile(file: File) {
 
 async function main() {
     // Load a placeholder scene
-    // const url = "https://huggingface.co/datasets/dylanebert/3dgs/resolve/main/bonsai/bonsai-7k.splat";
-    // await SPLAT.Loader.LoadAsync(url, scene, () => {});
+    const url = "https://huggingface.co/datasets/dylanebert/3dgs/resolve/main/bonsai/bonsai-7k.splat";
+    await SPLAT.Loader.LoadAsync(url, scene, () => {});
 
     // Render loop
     const frame = () => {

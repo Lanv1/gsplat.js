@@ -2,7 +2,6 @@ import { Matrix3 } from "../math/Matrix3";
 import { Quaternion } from "../math/Quaternion";
 import { Vector3 } from "../math/Vector3";
 import { EventDispatcher } from "./EventDispatcher";
-import eval_sh from "../renderers/webgl/utils/SphericalHarmonics";
 
 class Scene extends EventDispatcher {
     static RowLength = 3 * 4 + 3 * 4 + 4 + 4;
@@ -376,40 +375,6 @@ class Scene extends EventDispatcher {
                 For each gaussian, update the color in scene.data buffer
                 using spherical harmonics coefficients if provided
             */
-
-            const nbG = this.positions.length / 3;
-            const degs = new Uint8Array(nbG);
-            const dirs = new Float32Array(nbG*3);
-
-            for(let i = 0; i < nbG; i ++) {
-                let dir = new Vector3(
-                    this.positions[i*3] - camPos.x,
-                    this.positions[i*3+1] - camPos.y,
-                    this.positions[i*3+2] - camPos.z
-                );
-
-                dir = dir.normalize();
-                dirs[i*3] = dir.x;
-                dirs[i*3+1] = dir.y;
-                dirs[i*3+2] = dir.z;
-                
-                //Setting sh max degree at each gaussian (3 here)
-                degs[i] = 3;
-            }
-            
-            const newColors = eval_sh(degs, this._shs, dirs);    
-            const data_c = new Uint8Array(this._data.buffer);
-            let c_index = 0; 
-
-            //Update color only in the data buffer
-            for (let i = 0; i < this._vertexCount; i++) {
-
-                data_c[4 * (8 * i + 7) + 0] = newColors[c_index];
-                data_c[4 * (8 * i + 7) + 1] = newColors[c_index+1];
-                data_c[4 * (8 * i + 7) + 2] = newColors[c_index+2];
-
-                c_index += 3;
-            }
 
         } 
     }
