@@ -6,6 +6,8 @@ export const vertex = /* glsl */ `#version 300 es
 precision highp float;
 precision highp int;
 
+const float C0 = 0.28209479177387814;
+
 uniform highp usampler2D u_texture;
 uniform mat4 projection, view;
 uniform vec2 focal;
@@ -17,10 +19,24 @@ uniform float u_depthFade;
 in vec2 position;
 in int index;
 
+in vec4 shs0;
+in vec4 shs1;
+in vec4 shs2;
+in vec4 shs3;
+in vec4 shs4;
+in vec4 shs5;
+
 out vec4 vColor;
 out vec2 vPosition;
 
 void main () {
+    vec4 test2 = shs0 + shs1 + shs2 + shs3 + shs4 + shs5;
+
+    vec2 C0xy = unpackHalf2x16(floatBitsToUint(shs0.x));
+    vec2 C0zC1x = unpackHalf2x16(floatBitsToUint(shs0.y));
+
+    vec3 dc = vec3(C0xy.x, C0xy.y, C0zC1x.x);
+
     uvec4 cen = texelFetch(u_texture, ivec2((uint(index) & 0x3ffu) << 1, uint(index) >> 10), 0);
     vec4 cam = view * vec4(uintBitsToFloat(cen.xyz), 1);
     vec4 pos2d = projection * cam;
@@ -54,7 +70,12 @@ void main () {
     vec2 majorAxis = min(sqrt(2.0 * lambda1), 1024.0) * diagonalVector;
     vec2 minorAxis = min(sqrt(2.0 * lambda2), 1024.0) * vec2(diagonalVector.y, -diagonalVector.x);
 
-    vColor = vec4((cov.w) & 0xffu, (cov.w >> 8) & 0xffu, (cov.w >> 16) & 0xffu, (cov.w >> 24) & 0xffu) / 255.0;
+    // vColor = vec4((cov.w) & 0xffu, (cov.w >> 8) & 0xffu, (cov.w >> 16) & 0xffu, (cov.w >> 24) & 0xffu) / 255.0;
+    
+    vec3 col = ((0.00000001* test2[0]) + (C0 * dc))*255.0;
+    // vec3 col = ((0.00000001* test2[0]) + (C0 * test2.xyz))*255.0;
+    vColor = vec4(col, (cov.w >> 24) & 0xffu) / 255.0;
+
     vPosition = position;
 
     float scalingFactor = 1.0;

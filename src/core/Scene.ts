@@ -83,7 +83,7 @@ class Scene extends EventDispatcher {
             this._scales = new Float32Array(3 * this._vertexCount);
 
             if(typeof shs != 'undefined') {
-                this._shs = shs;
+                this._shs = new Float32Array(shs.length / 2);
             }
 
             const f_buffer = new Float32Array(data.buffer);
@@ -91,8 +91,23 @@ class Scene extends EventDispatcher {
 
             const data_c = new Uint8Array(this._data.buffer);
             const data_f = new Float32Array(this._data.buffer);
+            let shs_ind = 0;
+
+            const shs_f = new Float32Array(this._shs.buffer);
 
             for (let i = 0; i < this._vertexCount; i++) {
+
+                if(typeof shs != 'undefined') {
+                    // pack input F32 shs to H16 inside the scene.
+                    for(let j = 0; j < 48; j +=2) {
+                        this._shs[shs_ind] = packHalf2x16(shs_f[i*48+j], shs_f[i*48+j+1]);
+                        shs_ind ++;
+                    }
+                }
+
+                if(i == 0)
+                    console.log("shs in side set data ? " + this._shs[shs_ind] + " different from " + (shs as Float32Array)[0] + " half of this is " + floatToHalf((shs as Float32Array)[0]));
+
                 this._positions[3 * i + 0] = f_buffer[8 * i + 0];
                 this._positions[3 * i + 1] = f_buffer[8 * i + 1];
                 this._positions[3 * i + 2] = f_buffer[8 * i + 2];
@@ -405,6 +420,10 @@ class Scene extends EventDispatcher {
 
     get scales() {
         return this._scales;
+    }
+
+    get shs() {
+        return this._shs;
     }
 }
 

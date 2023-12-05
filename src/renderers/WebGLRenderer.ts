@@ -56,12 +56,20 @@ export class WebGLRenderer {
 
         let positionAttribute: number;
         let indexAttribute: number;
+        let shs0Attribute: number;
+        let shs1Attribute: number;
+        let shs2Attribute: number;
+        let shs3Attribute: number;
+        let shs4Attribute: number;
+        let shs5Attribute: number;
 
         let vertexBuffer: WebGLBuffer;
-        let centerBuffer: WebGLBuffer;
-        let colorBuffer: WebGLBuffer;
-        let covABuffer: WebGLBuffer;
-        let covBBuffer: WebGLBuffer;
+
+        // let shs32Buffer: WebGLBuffer;
+        // let centerBuffer: WebGLBuffer;
+        // let colorBuffer: WebGLBuffer;
+        // let covABuffer: WebGLBuffer;
+        // let covBBuffer: WebGLBuffer;
 
         let initialized = false;
 
@@ -89,6 +97,84 @@ export class WebGLRenderer {
             gl.uniform2fv(u_viewport, new Float32Array([canvas.width, canvas.height]));
         };
 
+        const setShAttribs = () => {
+            // const fullData = new Float32Array(32*activeScene.vertexCount);
+            // fullData.fill(1.0);
+            const shBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, shBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, activeScene.shs, gl.STATIC_DRAW);
+
+            console.log("SHS? " + activeScene.shs[0]);
+
+            const shLocs = [
+                shs0Attribute,
+                shs1Attribute,
+                shs2Attribute,
+                shs3Attribute,
+                shs4Attribute,
+                shs5Attribute
+            ];
+
+            const stride = 6 * (4 * 4);
+            for(let i = 0; i < 6; i ++)
+            {
+                const offset = i * (4 * 4);
+                gl.enableVertexAttribArray(shLocs[i]);
+
+                gl.vertexAttribPointer(
+                    shLocs[i],
+                    4,
+                    gl.FLOAT,
+                    false,
+                    stride,   
+                    16*i
+                );
+
+                gl.vertexAttribDivisor(shLocs[i], 1); //attribute changes only for each instance
+            }
+
+            // gl.bufferSubData(gl.ARRAY_BUFFER, )
+
+            // const byteOffset = 4 * (16+8);
+            // Mat4 attrib is 4 vec4 attribs (for 32 first sh coeffs)
+            // for(let i = 0; i < 4; i ++)
+            // {
+            //     const attribLoc = shs0Attribute + i;
+            //     gl.enableVertexAttribArray(attribLoc);
+                
+            //     gl.vertexAttribPointer(
+            //         attribLoc,
+            //         4,
+            //         gl.FLOAT,
+            //         false,
+            //         byteOffset,   // 2 mat4 per vertex
+            //         16*i
+            //     );
+
+            //     gl.vertexAttribDivisor(attribLoc, 1); //attribute changes only for each instance
+            // }
+
+            // for(let i = 0; i < 2; i ++)
+            // {
+            //     const attribLoc = shs32Attribute + i;
+            //     gl.enableVertexAttribArray(attribLoc);
+                
+            //     gl.vertexAttribPointer(
+            //         attribLoc,
+            //         4,
+            //         gl.FLOAT,
+            //         false,
+            //         byteOffset,   // 2 mat4 per vertex
+            //         48 + (16*i)
+            //     );
+
+            //     gl.vertexAttribDivisor(attribLoc, 1); //attribute changes only for each instance
+            // }
+
+            console.log("END of shs data filling.");
+
+        }
+
         const initWebGL = () => {
             worker = new SortWorker();
             const serializedScene = {
@@ -106,6 +192,7 @@ export class WebGLRenderer {
                 console.error(gl.getShaderInfoLog(vertexShader));
             }
 
+            gl.getParameter(gl.MAX_VERTEX_ATTRIBS)
             fragmentShader = gl.createShader(gl.FRAGMENT_SHADER) as WebGLShader;
             gl.shaderSource(fragmentShader, frag);
             gl.compileShader(fragmentShader);
@@ -149,19 +236,32 @@ export class WebGLRenderer {
             positionAttribute = gl.getAttribLocation(program, "position");
             gl.enableVertexAttribArray(positionAttribute);
             gl.vertexAttribPointer(positionAttribute, 2, gl.FLOAT, false, 0, 0);
-
-            const texture = gl.createTexture();
-            gl.bindTexture(gl.TEXTURE_2D, texture);
-
-            u_texture = gl.getUniformLocation(program, "u_texture") as WebGLUniformLocation;
-            gl.uniform1i(u_texture, 0);
-
+            
             const indexBuffer = gl.createBuffer() as WebGLBuffer;
             indexAttribute = gl.getAttribLocation(program, "index");
             gl.enableVertexAttribArray(indexAttribute);
             gl.bindBuffer(gl.ARRAY_BUFFER, indexBuffer);
             gl.vertexAttribIPointer(indexAttribute, 1, gl.INT, 0, 0);
             gl.vertexAttribDivisor(indexAttribute, 1);
+            
+            shs0Attribute = gl.getAttribLocation(program, "shs0");
+            shs1Attribute = gl.getAttribLocation(program, "shs1");
+            shs2Attribute = gl.getAttribLocation(program, "shs2");
+            shs3Attribute = gl.getAttribLocation(program, "shs3");
+            shs4Attribute = gl.getAttribLocation(program, "shs4");
+            shs5Attribute = gl.getAttribLocation(program, "shs5");
+            // shs32Attribute = gl.getAttribLocation(program, "shs32");
+            setShAttribs();
+            console.log("sh0loc: " + shs0Attribute);
+            // console.log("sh32loc: " + shs32Attribute);
+
+            
+            const texture = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+
+            u_texture = gl.getUniformLocation(program, "u_texture") as WebGLUniformLocation;
+            gl.uniform1i(u_texture, 0);
+
 
             gl.bindTexture(gl.TEXTURE_2D, texture);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -180,7 +280,7 @@ export class WebGLRenderer {
                 activeScene.data,
             );
             gl.activeTexture(gl.TEXTURE0);
-            gl.bindTexture(gl.TEXTURE_2D, texture);
+            // gl.bindTexture(gl.TEXTURE_2D, texture);
 
             for (const shaderPass of shaderPasses) {
                 shaderPass.init(this, program);
@@ -249,10 +349,6 @@ export class WebGLRenderer {
             gl.deleteProgram(program);
 
             gl.deleteBuffer(vertexBuffer);
-            gl.deleteBuffer(centerBuffer);
-            gl.deleteBuffer(colorBuffer);
-            gl.deleteBuffer(covABuffer);
-            gl.deleteBuffer(covBBuffer);
 
             initialized = false;
         };
