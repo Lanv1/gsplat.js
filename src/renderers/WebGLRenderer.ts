@@ -115,19 +115,19 @@ export class WebGLRenderer {
                 shs5Attribute
             ];
 
-            const stride = 6 * (4 * 4);
+            const stride = 6 * (4 * 4); // = size of 6 vec4 in bytes
             for(let i = 0; i < 6; i ++)
             {
+                console.log("sh " + i + " location: " + shLocs[i]);
                 const offset = i * (4 * 4);
                 gl.enableVertexAttribArray(shLocs[i]);
 
-                gl.vertexAttribPointer(
+                gl.vertexAttribIPointer(
                     shLocs[i],
                     4,
-                    gl.FLOAT,
-                    false,
+                    gl.UNSIGNED_INT,
                     stride,   
-                    16*i
+                    offset
                 );
 
                 gl.vertexAttribDivisor(shLocs[i], 1); //attribute changes only for each instance

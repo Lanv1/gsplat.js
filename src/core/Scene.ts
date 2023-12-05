@@ -13,7 +13,7 @@ class Scene extends EventDispatcher {
     private _positions: Float32Array;
     private _rotations: Float32Array;
     private _scales: Float32Array;
-    private _shs: Float32Array;
+    private _shs: Uint32Array;
 
     setData: (data: Uint8Array, shs?: Float32Array) => void;
     translate: (translation: Vector3) => void;
@@ -59,6 +59,7 @@ class Scene extends EventDispatcher {
             return (sign << 15) | (newExp << 10) | (frac >> 13);
         };
 
+        // x is on the 16 lsb, y on the 16 msb
         const packHalf2x16 = (x: number, y: number) => {
             return (floatToHalf(x) | (floatToHalf(y) << 16)) >>> 0;
         };
@@ -72,7 +73,7 @@ class Scene extends EventDispatcher {
         this._positions = new Float32Array(0);
         this._rotations = new Float32Array(0);
         this._scales = new Float32Array(0);
-        this._shs = new Float32Array(0);
+        this._shs = new Uint32Array(0);
 
         this.setData = (data: Uint8Array, shs?: Float32Array) => {
             this._vertexCount = data.length / Scene.RowLength;
@@ -83,7 +84,7 @@ class Scene extends EventDispatcher {
             this._scales = new Float32Array(3 * this._vertexCount);
 
             if(typeof shs != 'undefined') {
-                this._shs = new Float32Array(shs.length / 2);
+                this._shs = new Uint32Array(shs.length / 2);
             }
 
             const f_buffer = new Float32Array(data.buffer);
@@ -93,20 +94,16 @@ class Scene extends EventDispatcher {
             const data_f = new Float32Array(this._data.buffer);
             let shs_ind = 0;
 
-            const shs_f = new Float32Array(this._shs.buffer);
-
+            const shs_u = new Float32Array((shs as Float32Array).buffer);
             for (let i = 0; i < this._vertexCount; i++) {
 
                 if(typeof shs != 'undefined') {
                     // pack input F32 shs to H16 inside the scene.
                     for(let j = 0; j < 48; j +=2) {
-                        this._shs[shs_ind] = packHalf2x16(shs_f[i*48+j], shs_f[i*48+j+1]);
+                        this._shs[shs_ind] = packHalf2x16(shs_u[i*48+j], shs_u[i*48+j+1]);
                         shs_ind ++;
                     }
                 }
-
-                if(i == 0)
-                    console.log("shs in side set data ? " + this._shs[shs_ind] + " different from " + (shs as Float32Array)[0] + " half of this is " + floatToHalf((shs as Float32Array)[0]));
 
                 this._positions[3 * i + 0] = f_buffer[8 * i + 0];
                 this._positions[3 * i + 1] = f_buffer[8 * i + 1];
