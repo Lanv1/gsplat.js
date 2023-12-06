@@ -208,18 +208,6 @@ export class WebGLRenderer {
             gl.vertexAttribIPointer(indexAttribute, 1, gl.INT, 0, 0);
             gl.vertexAttribDivisor(indexAttribute, 1);
             
-            // shs0Attribute = gl.getAttribLocation(program, "shs0");
-            // shs1Attribute = gl.getAttribLocation(program, "shs1");
-            // shs2Attribute = gl.getAttribLocation(program, "shs2");
-            // shs3Attribute = gl.getAttribLocation(program, "shs3");
-            // shs4Attribute = gl.getAttribLocation(program, "shs4");
-            // shs5Attribute = gl.getAttribLocation(program, "shs5");
-            // shs32Attribute = gl.getAttribLocation(program, "shs32");
-            // setShAttribs();
-            // console.log("sh0loc: " + shs0Attribute);
-            // console.log("sh32loc: " + shs32Attribute);
-
-            
             const texture = gl.createTexture();
             gl.bindTexture(gl.TEXTURE_2D, texture);
      
@@ -239,7 +227,7 @@ export class WebGLRenderer {
                 activeScene.data,
             );
             
-            //2nd texture holding shs ()
+            //2nd texture holding shs coefficients (with padding)
             const shTexture = gl.createTexture();
             gl.bindTexture(gl.TEXTURE_2D, shTexture);
               
@@ -320,8 +308,6 @@ export class WebGLRenderer {
                 for (const shaderPass of shaderPasses) {
                     shaderPass.render();
                 }
-                // console.log("camera pos ? " + activeCamera.viewMatrix.buffer[12] + ", " + activeCamera.viewMatrix.buffer[13] + ", " + activeCamera.viewMatrix.buffer[14]);
-                // console.log("actual pos:? " + activeCamera.position.x + ", " + activeCamera.position.y + ", " + activeCamera.position.z);
                 gl.uniformMatrix4fv(u_view, false, activeCamera.viewMatrix.buffer);
                 gl.clear(gl.COLOR_BUFFER_BIT);
                 gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 4, activeScene.vertexCount);

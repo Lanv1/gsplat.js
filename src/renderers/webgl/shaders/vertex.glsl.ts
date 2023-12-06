@@ -73,12 +73,13 @@ void main () {
     vec2 C3yC3z = unpackHalf2x16(shs1.y);
 
     vec3 result = SH_C0*vec3(C0xy.x, C0xy.y, C0zC1x.x);
-    // vec3 dir = normalize(p - inverse(view)[3].xyz);
-    // vec3 sh1 = vec3(C0zC1x.y, C1yC1z.x, C1yC1z.y);
-    // vec3 sh2 = vec3(C2xC2y.x, C2xC2y.y, C2zC3x.x);
-    // vec3 sh3 = vec3(C2zC3x.y, C3yC3z.x, C3yC3z.y);
+    vec3 dir = normalize(p - inverse(view)[3].xyz);
+    
+    vec3 sh1 = vec3(C0zC1x.y, C1yC1z.x, C1yC1z.y);
+    vec3 sh2 = vec3(C2xC2y.x, C2xC2y.y, C2zC3x.x);
+    vec3 sh3 = vec3(C2zC3x.y, C3yC3z.x, C3yC3z.y);
 
-    // result = result - ((SH_C1 * dir.y) * sh1) +  ((SH_C1 * dir.z) * sh2) -  ((SH_C1 * dir.x) * sh3);
+    result = result - ((SH_C1 * dir.y) * sh1) +  ((SH_C1 * dir.z) * sh2) -  ((SH_C1 * dir.x) * sh3);
 
     vec3 dc = 255.0 * (0.5  + result);
     vColor = vec4(dc, ((cov.w >> 24) & 0xffu)) / 255.0;
