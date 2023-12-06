@@ -7,8 +7,10 @@ precision highp float;
 precision highp int;
 
 const float SH_C0 = 0.28209479177387814;
+const float SH_C1 = 0.4886025119029199;
 
 uniform highp usampler2D u_texture;
+uniform highp usampler2D u_shTexture;
 uniform mat4 projection, view;
 uniform vec2 focal;
 uniform vec2 viewport;
@@ -19,27 +21,14 @@ uniform float u_depthFade;
 in vec2 position;
 in int index;
 
-in uvec4 shs0;
-in uvec4 shs1;
-in uvec4 shs2;
-in uvec4 shs3;
-in uvec4 shs4;
-in uvec4 shs5;
-
 out vec4 vColor;
 out vec2 vPosition;
 
 void main () {
-    uvec4 test2 = shs0 + shs1 + shs2 + shs3 + shs4 + shs5;
-
-    vec2 C0xy = unpackHalf2x16(shs0.x);
-    vec2 C0zC1x = unpackHalf2x16(shs0.y);
-
-
-    vec3 dc = 255.0 * ((0.5 + (0.*float(test2[0])) + SH_C0*vec3(C0xy.x, C0xy.y, C0zC1x.x)));
 
     uvec4 cen = texelFetch(u_texture, ivec2((uint(index) & 0x3ffu) << 1, uint(index) >> 10), 0);
-    vec4 cam = view * vec4(uintBitsToFloat(cen.xyz), 1);
+    vec3 p = uintBitsToFloat(cen.xyz);
+    vec4 cam = view * vec4(p, 1);
     vec4 pos2d = projection * cam;
 
     float clip = 1.2 * pos2d.w;
@@ -47,7 +36,6 @@ void main () {
         gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
         return;
     }
-
 
     uvec4 cov = texelFetch(u_texture, ivec2(((uint(index) & 0x3ffu) << 1) | 1u, uint(index) >> 10), 0);
     vec2 u1 = unpackHalf2x16(cov.x), u2 = unpackHalf2x16(cov.y), u3 = unpackHalf2x16(cov.z);
@@ -72,6 +60,27 @@ void main () {
     vec2 minorAxis = min(sqrt(2.0 * lambda2), 1024.0) * vec2(diagonalVector.y, -diagonalVector.x);
 
     // vColor = vec4((cov.w) & 0xffu, (cov.w >> 8) & 0xffu, (cov.w >> 16) & 0xffu, (cov.w >> 24) & 0xffu) / 255.0;
+
+    //color based on spherical harmonics
+    uvec4 shs0 = texelFetch(u_shTexture, ivec2(((uint(index) & 0xffu) << 3), uint(index) >> 8), 0);
+    vec2 C0xy = unpackHalf2x16(shs0.x);
+    vec2 C0zC1x = unpackHalf2x16(shs0.y);
+    vec2 C1yC1z = unpackHalf2x16(shs0.z);
+    vec2 C2xC2y = unpackHalf2x16(shs0.t);
+    
+    uvec4 shs1 = texelFetch(u_shTexture, ivec2(((uint(index) & 0xffu) << 3) | 1u, uint(index) >> 8), 0);
+    vec2 C2zC3x = unpackHalf2x16(shs1.x);
+    vec2 C3yC3z = unpackHalf2x16(shs1.y);
+
+    vec3 result = SH_C0*vec3(C0xy.x, C0xy.y, C0zC1x.x);
+    // vec3 dir = normalize(p - inverse(view)[3].xyz);
+    // vec3 sh1 = vec3(C0zC1x.y, C1yC1z.x, C1yC1z.y);
+    // vec3 sh2 = vec3(C2xC2y.x, C2xC2y.y, C2zC3x.x);
+    // vec3 sh3 = vec3(C2zC3x.y, C3yC3z.x, C3yC3z.y);
+
+    // result = result - ((SH_C1 * dir.y) * sh1) +  ((SH_C1 * dir.z) * sh2) -  ((SH_C1 * dir.x) * sh3);
+
+    vec3 dc = 255.0 * (0.5  + result);
     vColor = vec4(dc, ((cov.w >> 24) & 0xffu)) / 255.0;
 
     vPosition = position;

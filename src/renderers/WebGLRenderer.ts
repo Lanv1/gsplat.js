@@ -53,7 +53,9 @@ export class WebGLRenderer {
         let u_focal: WebGLUniformLocation;
         let u_view: WebGLUniformLocation;
         let u_texture: WebGLUniformLocation;
-
+        
+        let u_shTexture: WebGLUniformLocation;
+        
         let positionAttribute: number;
         let indexAttribute: number;
         let shs0Attribute: number;
@@ -132,45 +134,6 @@ export class WebGLRenderer {
 
                 gl.vertexAttribDivisor(shLocs[i], 1); //attribute changes only for each instance
             }
-
-            // gl.bufferSubData(gl.ARRAY_BUFFER, )
-
-            // const byteOffset = 4 * (16+8);
-            // Mat4 attrib is 4 vec4 attribs (for 32 first sh coeffs)
-            // for(let i = 0; i < 4; i ++)
-            // {
-            //     const attribLoc = shs0Attribute + i;
-            //     gl.enableVertexAttribArray(attribLoc);
-                
-            //     gl.vertexAttribPointer(
-            //         attribLoc,
-            //         4,
-            //         gl.FLOAT,
-            //         false,
-            //         byteOffset,   // 2 mat4 per vertex
-            //         16*i
-            //     );
-
-            //     gl.vertexAttribDivisor(attribLoc, 1); //attribute changes only for each instance
-            // }
-
-            // for(let i = 0; i < 2; i ++)
-            // {
-            //     const attribLoc = shs32Attribute + i;
-            //     gl.enableVertexAttribArray(attribLoc);
-                
-            //     gl.vertexAttribPointer(
-            //         attribLoc,
-            //         4,
-            //         gl.FLOAT,
-            //         false,
-            //         byteOffset,   // 2 mat4 per vertex
-            //         48 + (16*i)
-            //     );
-
-            //     gl.vertexAttribDivisor(attribLoc, 1); //attribute changes only for each instance
-            // }
-
             console.log("END of shs data filling.");
 
         }
@@ -238,32 +201,28 @@ export class WebGLRenderer {
             gl.vertexAttribPointer(positionAttribute, 2, gl.FLOAT, false, 0, 0);
             
             const indexBuffer = gl.createBuffer() as WebGLBuffer;
+            gl.bindBuffer(gl.ARRAY_BUFFER, indexBuffer);
+            
             indexAttribute = gl.getAttribLocation(program, "index");
             gl.enableVertexAttribArray(indexAttribute);
-            gl.bindBuffer(gl.ARRAY_BUFFER, indexBuffer);
             gl.vertexAttribIPointer(indexAttribute, 1, gl.INT, 0, 0);
             gl.vertexAttribDivisor(indexAttribute, 1);
             
-            shs0Attribute = gl.getAttribLocation(program, "shs0");
-            shs1Attribute = gl.getAttribLocation(program, "shs1");
-            shs2Attribute = gl.getAttribLocation(program, "shs2");
-            shs3Attribute = gl.getAttribLocation(program, "shs3");
-            shs4Attribute = gl.getAttribLocation(program, "shs4");
-            shs5Attribute = gl.getAttribLocation(program, "shs5");
+            // shs0Attribute = gl.getAttribLocation(program, "shs0");
+            // shs1Attribute = gl.getAttribLocation(program, "shs1");
+            // shs2Attribute = gl.getAttribLocation(program, "shs2");
+            // shs3Attribute = gl.getAttribLocation(program, "shs3");
+            // shs4Attribute = gl.getAttribLocation(program, "shs4");
+            // shs5Attribute = gl.getAttribLocation(program, "shs5");
             // shs32Attribute = gl.getAttribLocation(program, "shs32");
-            setShAttribs();
-            console.log("sh0loc: " + shs0Attribute);
+            // setShAttribs();
+            // console.log("sh0loc: " + shs0Attribute);
             // console.log("sh32loc: " + shs32Attribute);
 
             
             const texture = gl.createTexture();
             gl.bindTexture(gl.TEXTURE_2D, texture);
-
-            u_texture = gl.getUniformLocation(program, "u_texture") as WebGLUniformLocation;
-            gl.uniform1i(u_texture, 0);
-
-
-            gl.bindTexture(gl.TEXTURE_2D, texture);
+     
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
@@ -279,8 +238,39 @@ export class WebGLRenderer {
                 gl.UNSIGNED_INT,
                 activeScene.data,
             );
+            
+            //2nd texture holding shs ()
+            const shTexture = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, shTexture);
+              
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+            gl.texImage2D(
+                gl.TEXTURE_2D,
+                0,
+                gl.RGBA32UI,
+                activeScene.width,
+                activeScene.shHeight,
+                0,
+                gl.RGBA_INTEGER,
+                gl.UNSIGNED_INT,
+                activeScene.shs,
+            );
+
+            u_texture = gl.getUniformLocation(program, "u_texture") as WebGLUniformLocation;
+            u_shTexture = gl.getUniformLocation(program, "u_shTexture") as WebGLUniformLocation;
+            
+            gl.uniform1i(u_texture, 0);
+            gl.uniform1i(u_shTexture, 1);
+            
             gl.activeTexture(gl.TEXTURE0);
-            // gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+
+            gl.activeTexture(gl.TEXTURE1);
+            gl.bindTexture(gl.TEXTURE_2D, shTexture);
+            
 
             for (const shaderPass of shaderPasses) {
                 shaderPass.init(this, program);
@@ -301,7 +291,6 @@ export class WebGLRenderer {
             if (initialized) {
                 this.dispose();
             }
-
             initWebGL();
         };
 
@@ -331,6 +320,8 @@ export class WebGLRenderer {
                 for (const shaderPass of shaderPasses) {
                     shaderPass.render();
                 }
+                // console.log("camera pos ? " + activeCamera.viewMatrix.buffer[12] + ", " + activeCamera.viewMatrix.buffer[13] + ", " + activeCamera.viewMatrix.buffer[14]);
+                // console.log("actual pos:? " + activeCamera.position.x + ", " + activeCamera.position.y + ", " + activeCamera.position.z);
                 gl.uniformMatrix4fv(u_view, false, activeCamera.viewMatrix.buffer);
                 gl.clear(gl.COLOR_BUFFER_BIT);
                 gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 4, activeScene.vertexCount);

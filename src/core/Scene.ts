@@ -14,6 +14,7 @@ class Scene extends EventDispatcher {
     private _rotations: Float32Array;
     private _scales: Float32Array;
     private _shs: Uint32Array;
+    private _shHeight: number;
 
     setData: (data: Uint8Array, shs?: Float32Array) => void;
     translate: (translation: Vector3) => void;
@@ -70,6 +71,7 @@ class Scene extends EventDispatcher {
         this._vertexCount = 0;
         this._width = 2048;
         this._height = 0;
+        this._shHeight = 0;
         this._positions = new Float32Array(0);
         this._rotations = new Float32Array(0);
         this._scales = new Float32Array(0);
@@ -78,13 +80,16 @@ class Scene extends EventDispatcher {
         this.setData = (data: Uint8Array, shs?: Float32Array) => {
             this._vertexCount = data.length / Scene.RowLength;
             this._height = Math.ceil((2 * this._vertexCount) / this._width);
+            this._shHeight = Math.ceil((8 * this._vertexCount) / this._width);
             this._data = new Uint32Array(this._width * this._height * 4);
             this._positions = new Float32Array(3 * this._vertexCount);
             this._rotations = new Float32Array(4 * this._vertexCount);
             this._scales = new Float32Array(3 * this._vertexCount);
 
             if(typeof shs != 'undefined') {
-                this._shs = new Uint32Array(shs.length / 2);
+                //padding added
+                // this._shs = new Uint32Array(this.vertexCount * (24 + 8));
+                this._shs = new Uint32Array(this._width* this._shHeight * 4);
             }
 
             const f_buffer = new Float32Array(data.buffer);
@@ -94,13 +99,18 @@ class Scene extends EventDispatcher {
             const data_f = new Float32Array(this._data.buffer);
             let shs_ind = 0;
 
-            const shs_u = new Float32Array((shs as Float32Array).buffer);
+            const shs_f = new Float32Array((shs as Float32Array).buffer);
             for (let i = 0; i < this._vertexCount; i++) {
 
                 if(typeof shs != 'undefined') {
                     // pack input F32 shs to H16 inside the scene.
                     for(let j = 0; j < 48; j +=2) {
-                        this._shs[shs_ind] = packHalf2x16(shs_u[i*48+j], shs_u[i*48+j+1]);
+                        this._shs[shs_ind] = packHalf2x16(shs_f[i*48+j], shs_f[i*48+(j+1)]);
+                        shs_ind ++;
+                    }
+
+                    for(let j = 0; j < 8; j ++) {
+                        this._shs[shs_ind] = 0;
                         shs_ind ++;
                     }
                 }
@@ -421,6 +431,10 @@ class Scene extends EventDispatcher {
 
     get shs() {
         return this._shs;
+    }
+
+    get shHeight() {
+        return this._shHeight;
     }
 }
 

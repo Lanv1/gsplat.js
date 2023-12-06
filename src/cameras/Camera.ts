@@ -64,6 +64,7 @@ class Camera extends Object3D {
             );
             this.viewMatrix = getViewMatrix();
             this.viewProj = this.projectionMatrix.multiply(this.viewMatrix);
+
         };
     }
 }
