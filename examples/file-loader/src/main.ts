@@ -12,18 +12,14 @@ async function selectFile(file: File) {
     loading = true;
     // Check if .splat file
     if (file.name.endsWith(".splat")) {
-        await SPLAT.Loader.LoadFromFileAsync(file, scene, (progress: number) => {
-            console.log("Loading SPLAT file: " + progress);
-        });
+        await SPLAT.Loader.LoadFromFileAsync(file, scene);
     } else if (file.name.endsWith(".ply")) {
         const format = "";
         // const format = "polycam"; // Uncomment to load a Polycam PLY file
         await SPLAT.PLYLoader.LoadFromFileAsync(
             file,
             scene,
-            (progress: number) => {
-                console.log("Loading PLY file: " + progress);
-            },
+            undefined,
             format,
             true
         );

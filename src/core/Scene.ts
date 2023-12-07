@@ -88,7 +88,6 @@ class Scene extends EventDispatcher {
 
             if(typeof shs != 'undefined') {
                 //padding added
-                // this._shs = new Uint32Array(this.vertexCount * (24 + 8));
                 this._shs = new Uint32Array(this._width* this._shHeight * 4);
             }
 

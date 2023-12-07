@@ -43,11 +43,19 @@ class PLYLoader {
         }
 
         if(useShs) {
+            let before = performance.now();
             const rawData = this._ParseFullPLYBuffer(plyData.buffer, format);
+            let after = performance.now();
+
+            console.log("PLY file loading took " + (after - before) + " ms.");
+            
             const data = new Uint8Array(rawData[0]);
             const shData = new Float32Array(rawData[1]);
-
+            before = performance.now();
             scene.setData(data, shData);
+            after = performance.now();
+
+            console.log("setting the data in textures took " + (after - before) + " ms.");
         } else {
             const data = new Uint8Array(this._ParsePLYBuffer(plyData.buffer, format));
             scene.setData(data);
@@ -65,11 +73,20 @@ class PLYLoader {
         const reader = new FileReader();
         reader.onload = (e) => {
             if(useShs) {
+                
+                let before = performance.now();
                 const rawData = this._ParseFullPLYBuffer(e.target!.result as ArrayBuffer, format);
+                let after = performance.now();
                 const data = new Uint8Array(rawData[0]);
                 const shData = new Float32Array(rawData[1]);
 
+                console.log("PLY file loading took " + (after - before) + " ms.");
+                
+                before = performance.now();            
                 scene.setData(data, shData);
+                after = performance.now();
+
+                console.log("setting the data in textures took " + (after - before) + " ms.");
             } else {
                 const data = new Uint8Array(this._ParsePLYBuffer(e.target!.result as ArrayBuffer, format));
                 scene.setData(data);

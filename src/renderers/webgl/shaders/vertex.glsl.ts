@@ -8,12 +8,92 @@ precision highp int;
 
 const float SH_C0 = 0.28209479177387814;
 const float SH_C1 = 0.4886025119029199;
+const float SH_C2[5] = float[](
+    1.0925484305920792,
+    -1.0925484305920792,
+    0.31539156525252005,
+    -1.0925484305920792,
+    0.5462742152960396
+);
+
+const float SH_C3[7] = float[](
+    -0.5900435899266435,
+    2.890611442640554,
+    -0.4570457994644658,
+    0.3731763325901154,
+    -0.4570457994644658,
+    1.445305721320277,
+    -0.5900435899266435
+);
+
+
+vec3 eval_sh(highp usampler2D tex, int index, uint deg, vec3 dir) {
+    uvec4 packedShs;
+    float shs[48];
+    uint offsetMask = 0u;
+    
+    for(int i = 0; i < 6; i ++) {
+        offsetMask = uint(i);
+        packedShs = texelFetch(tex, ivec2(((uint(index) & 0xffu) << 3) | offsetMask, uint(index) >> 8), 0);
+        
+        vec2 s0 = unpackHalf2x16(packedShs.x);
+        vec2 s1 = unpackHalf2x16(packedShs.y);
+        vec2 s2 = unpackHalf2x16(packedShs.z);
+        vec2 s3 = unpackHalf2x16(packedShs.w);
+        
+        shs[i*8] = s0.x;
+        shs[i*8+1] = s0.y;
+        shs[i*8+2] = s1.x;
+        shs[i*8+3] = s1.y;
+        shs[i*8+4] = s2.x;
+        shs[i*8+5] = s2.y;
+        shs[i*8+6] = s3.x;
+        shs[i*8+7] = s3.y;
+    }
+    
+    vec3 result = SH_C0 * vec3(shs[0], shs[1], shs[2]);
+
+    if(deg > 0u) {
+        float x = dir.x, y = dir.y, z = dir.z;
+        result = result - 
+            (SH_C1 * y * vec3(shs[3], shs[4], shs[5])) + 
+            (SH_C1 * z * vec3(shs[6], shs[7], shs[8])) - 
+            (SH_C1 * x * vec3(shs[9], shs[10], shs[11]));
+
+        if(deg > 1u) {
+            float xx = x*x, yy = y*y, zz = z*z;
+            float xy = x * y, yz = y * z, xz = x * z;
+
+            result = result +
+                (SH_C2[0] * xy * vec3(shs[12], shs[13], shs[14])) +
+                (SH_C2[1] * yz * vec3(shs[15], shs[16], shs[17])) +
+                (SH_C2[2] * (2.0 * zz - xx - yy) * vec3(shs[18], shs[19], shs[20])) +
+                (SH_C2[3] * xz * vec3(shs[21], shs[22], shs[23])) +
+                (SH_C2[4] * (xx - yy) * vec3(shs[24], shs[25], shs[26]));
+
+            if(deg > 2u) {
+                result = result +
+                    (SH_C3[0] * y * (3.0 * xx - yy) * vec3(shs[27], shs[28], shs[29])) +
+                    (SH_C3[1] * xy * z * vec3(shs[30], shs[31], shs[32])) +
+                    (SH_C3[2] * y * (4.0 * zz - xx - yy)* vec3(shs[33], shs[34], shs[35])) +
+                    (SH_C3[3] * z * (2.0 * zz - 3.0 * xx - 3.0 * yy) * vec3(shs[36], shs[37], shs[38])) +
+                    (SH_C3[4] * x * (4.0 * zz - xx - yy) * vec3(shs[39], shs[40], shs[41])) +
+                    (SH_C3[5] * z * (xx - yy) * vec3(shs[42], shs[43], shs[44])) +
+                    (SH_C3[6] * x * (xx - 3.0 * yy) * vec3(shs[45], shs[46], shs[47]));
+            }
+        }
+    }
+
+    return result;
+}
+
 
 uniform highp usampler2D u_texture;
 uniform highp usampler2D u_shTexture;
 uniform mat4 projection, view;
 uniform vec2 focal;
 uniform vec2 viewport;
+uniform vec3 camPos;
 
 uniform bool u_useDepthFade;
 uniform float u_depthFade;
@@ -62,27 +142,13 @@ void main () {
     // vColor = vec4((cov.w) & 0xffu, (cov.w >> 8) & 0xffu, (cov.w >> 16) & 0xffu, (cov.w >> 24) & 0xffu) / 255.0;
 
     //color based on spherical harmonics
-    uvec4 shs0 = texelFetch(u_shTexture, ivec2(((uint(index) & 0xffu) << 3), uint(index) >> 8), 0);
-    vec2 C0xy = unpackHalf2x16(shs0.x);
-    vec2 C0zC1x = unpackHalf2x16(shs0.y);
-    vec2 C1yC1z = unpackHalf2x16(shs0.z);
-    vec2 C2xC2y = unpackHalf2x16(shs0.t);
-    
-    uvec4 shs1 = texelFetch(u_shTexture, ivec2(((uint(index) & 0xffu) << 3) | 1u, uint(index) >> 8), 0);
-    vec2 C2zC3x = unpackHalf2x16(shs1.x);
-    vec2 C3yC3z = unpackHalf2x16(shs1.y);
-
-    vec3 result = SH_C0*vec3(C0xy.x, C0xy.y, C0zC1x.x);
+    // vec3 dir = normalize(p - camPos);
+    const uint deg = 3u;    //degree per gaussian can be set (would have to store it in sh texture padding).
     vec3 dir = normalize(p - inverse(view)[3].xyz);
-    
-    vec3 sh1 = vec3(C0zC1x.y, C1yC1z.x, C1yC1z.y);
-    vec3 sh2 = vec3(C2xC2y.x, C2xC2y.y, C2zC3x.x);
-    vec3 sh3 = vec3(C2zC3x.y, C3yC3z.x, C3yC3z.y);
-
-    result = result - ((SH_C1 * dir.y) * sh1) +  ((SH_C1 * dir.z) * sh2) -  ((SH_C1 * dir.x) * sh3);
-
-    vec3 dc = 255.0 * (0.5  + result);
-    vColor = vec4(dc, ((cov.w >> 24) & 0xffu)) / 255.0;
+    vec3 col = eval_sh(u_shTexture, index, deg, dir);
+    vec3 rgb = (0.5  + col);
+    float opacity = float(((cov.w >> 24) & 0xffu)) / 255.0;
+    vColor = vec4(rgb, opacity);
 
     vPosition = position;
 

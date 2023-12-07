@@ -53,6 +53,7 @@ export class WebGLRenderer {
         let u_focal: WebGLUniformLocation;
         let u_view: WebGLUniformLocation;
         let u_texture: WebGLUniformLocation;
+        let u_camPos: WebGLUniformLocation;
         
         let u_shTexture: WebGLUniformLocation;
         
@@ -95,48 +96,12 @@ export class WebGLRenderer {
             u_projection = gl.getUniformLocation(program, "projection") as WebGLUniformLocation;
             gl.uniformMatrix4fv(u_projection, false, activeCamera.projectionMatrix.buffer);
 
+            u_camPos = gl.getUniformLocation(program, "camPos") as WebGLUniformLocation;
+            gl.uniform3fv(u_camPos, new Float32Array(activeCamera.position.flat()));
+
             u_viewport = gl.getUniformLocation(program, "viewport") as WebGLUniformLocation;
             gl.uniform2fv(u_viewport, new Float32Array([canvas.width, canvas.height]));
         };
-
-        const setShAttribs = () => {
-            // const fullData = new Float32Array(32*activeScene.vertexCount);
-            // fullData.fill(1.0);
-            const shBuffer = gl.createBuffer();
-            gl.bindBuffer(gl.ARRAY_BUFFER, shBuffer);
-            gl.bufferData(gl.ARRAY_BUFFER, activeScene.shs, gl.STATIC_DRAW);
-
-            console.log("SHS? " + activeScene.shs[0]);
-
-            const shLocs = [
-                shs0Attribute,
-                shs1Attribute,
-                shs2Attribute,
-                shs3Attribute,
-                shs4Attribute,
-                shs5Attribute
-            ];
-
-            const stride = 6 * (4 * 4); // = size of 6 vec4 in bytes
-            for(let i = 0; i < 6; i ++)
-            {
-                console.log("sh " + i + " location: " + shLocs[i]);
-                const offset = i * (4 * 4);
-                gl.enableVertexAttribArray(shLocs[i]);
-
-                gl.vertexAttribIPointer(
-                    shLocs[i],
-                    4,
-                    gl.UNSIGNED_INT,
-                    stride,   
-                    offset
-                );
-
-                gl.vertexAttribDivisor(shLocs[i], 1); //attribute changes only for each instance
-            }
-            console.log("END of shs data filling.");
-
-        }
 
         const initWebGL = () => {
             worker = new SortWorker();
@@ -182,6 +147,9 @@ export class WebGLRenderer {
             u_projection = gl.getUniformLocation(program, "projection") as WebGLUniformLocation;
             gl.uniformMatrix4fv(u_projection, false, activeCamera.projectionMatrix.buffer);
 
+            u_camPos = gl.getUniformLocation(program, "camPos") as WebGLUniformLocation;
+            gl.uniform3fv(u_camPos, new Float32Array(activeCamera.position.flat()));
+
             u_viewport = gl.getUniformLocation(program, "viewport") as WebGLUniformLocation;
             gl.uniform2fv(u_viewport, new Float32Array([canvas.width, canvas.height]));
 
@@ -190,6 +158,8 @@ export class WebGLRenderer {
 
             u_view = gl.getUniformLocation(program, "view") as WebGLUniformLocation;
             gl.uniformMatrix4fv(u_view, false, activeCamera.viewMatrix.buffer);
+
+
 
             const triangleVertices = new Float32Array([-2, -2, 2, -2, 2, 2, -2, 2]);
             vertexBuffer = gl.createBuffer() as WebGLBuffer;
@@ -309,6 +279,9 @@ export class WebGLRenderer {
                     shaderPass.render();
                 }
                 gl.uniformMatrix4fv(u_view, false, activeCamera.viewMatrix.buffer);
+                gl.uniform3fv(u_camPos, new Float32Array(activeCamera.position.flat()));
+
+                // console.log("campos: " + activeCamera.position.flat());
                 gl.clear(gl.COLOR_BUFFER_BIT);
                 gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 4, activeScene.vertexCount);
             } else {
