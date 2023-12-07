@@ -98,6 +98,8 @@ uniform vec3 camPos;
 uniform bool u_useDepthFade;
 uniform float u_depthFade;
 
+uniform bool u_useShs;
+
 in vec2 position;
 in int index;
 
@@ -139,15 +141,21 @@ void main () {
     vec2 majorAxis = min(sqrt(2.0 * lambda1), 1024.0) * diagonalVector;
     vec2 minorAxis = min(sqrt(2.0 * lambda2), 1024.0) * vec2(diagonalVector.y, -diagonalVector.x);
 
-    // vColor = vec4((cov.w) & 0xffu, (cov.w >> 8) & 0xffu, (cov.w >> 16) & 0xffu, (cov.w >> 24) & 0xffu) / 255.0;
+    vec3 rgb;
+    float opacity = float(((cov.w >> 24) & 0xffu)) / 255.0;
 
     //color based on spherical harmonics
-    // vec3 dir = normalize(p - camPos);
-    const uint deg = 3u;    //degree per gaussian can be set (would have to store it in sh texture padding).
-    vec3 dir = normalize(p - inverse(view)[3].xyz);
-    vec3 col = eval_sh(u_shTexture, index, deg, dir);
-    vec3 rgb = (0.5  + col);
-    float opacity = float(((cov.w >> 24) & 0xffu)) / 255.0;
+    if(u_useShs) {
+        const uint deg = 3u;    //degree per gaussian can be set (would have to store it in sh texture padding).
+        vec3 dir = normalize(p - inverse(view)[3].xyz);
+        vec3 col = eval_sh(u_shTexture, index, deg, dir);
+        rgb = (0.5  + col);
+        
+    } else {
+
+        rgb = vec3((cov.w) & 0xffu, (cov.w >> 8) & 0xffu, (cov.w >> 16) & 0xffu) / 255.0;
+    }
+
     vColor = vec4(rgb, opacity);
 
     vPosition = position;

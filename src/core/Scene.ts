@@ -86,6 +86,7 @@ class Scene extends EventDispatcher {
             this._rotations = new Float32Array(4 * this._vertexCount);
             this._scales = new Float32Array(3 * this._vertexCount);
 
+            let shs_ind = 0;
             if(typeof shs != 'undefined') {
                 //padding added
                 this._shs = new Uint32Array(this._width* this._shHeight * 4);
@@ -96,15 +97,13 @@ class Scene extends EventDispatcher {
 
             const data_c = new Uint8Array(this._data.buffer);
             const data_f = new Float32Array(this._data.buffer);
-            let shs_ind = 0;
 
-            const shs_f = new Float32Array((shs as Float32Array).buffer);
             for (let i = 0; i < this._vertexCount; i++) {
 
                 if(typeof shs != 'undefined') {
                     // pack input F32 shs to H16 inside the scene.
                     for(let j = 0; j < 48; j +=2) {
-                        this._shs[shs_ind] = packHalf2x16(shs_f[i*48+j], shs_f[i*48+(j+1)]);
+                        this._shs[shs_ind] = packHalf2x16(shs[i*48+j], shs[i*48+(j+1)]);
                         shs_ind ++;
                     }
 

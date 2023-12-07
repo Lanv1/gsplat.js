@@ -56,23 +56,13 @@ export class WebGLRenderer {
         let u_camPos: WebGLUniformLocation;
         
         let u_shTexture: WebGLUniformLocation;
+
+        let u_useShs: WebGLUniformLocation;
         
         let positionAttribute: number;
         let indexAttribute: number;
-        let shs0Attribute: number;
-        let shs1Attribute: number;
-        let shs2Attribute: number;
-        let shs3Attribute: number;
-        let shs4Attribute: number;
-        let shs5Attribute: number;
 
         let vertexBuffer: WebGLBuffer;
-
-        // let shs32Buffer: WebGLBuffer;
-        // let centerBuffer: WebGLBuffer;
-        // let colorBuffer: WebGLBuffer;
-        // let covABuffer: WebGLBuffer;
-        // let covBBuffer: WebGLBuffer;
 
         let initialized = false;
 
@@ -198,37 +188,42 @@ export class WebGLRenderer {
             );
             
             //2nd texture holding shs coefficients (with padding)
-            const shTexture = gl.createTexture();
-            gl.bindTexture(gl.TEXTURE_2D, shTexture);
-              
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-            gl.texImage2D(
-                gl.TEXTURE_2D,
-                0,
-                gl.RGBA32UI,
-                activeScene.width,
-                activeScene.shHeight,
-                0,
-                gl.RGBA_INTEGER,
-                gl.UNSIGNED_INT,
-                activeScene.shs,
-            );
-
-            u_texture = gl.getUniformLocation(program, "u_texture") as WebGLUniformLocation;
-            u_shTexture = gl.getUniformLocation(program, "u_shTexture") as WebGLUniformLocation;
+            u_useShs = gl.getUniformLocation(program, "u_useShs") as WebGLUniformLocation;
+            gl.uniform1i(u_useShs, 0);
             
+            if(activeScene.shs.length) {
+                gl.uniform1i(u_useShs, 1);
+                const shTexture = gl.createTexture();
+                gl.bindTexture(gl.TEXTURE_2D, shTexture);
+                  
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+                gl.texImage2D(
+                    gl.TEXTURE_2D,
+                    0,
+                    gl.RGBA32UI,
+                    activeScene.width,
+                    activeScene.shHeight,
+                    0,
+                    gl.RGBA_INTEGER,
+                    gl.UNSIGNED_INT,
+                    activeScene.shs,
+                );
+    
+                u_shTexture = gl.getUniformLocation(program, "u_shTexture") as WebGLUniformLocation;
+                gl.uniform1i(u_shTexture, 1);
+
+                gl.activeTexture(gl.TEXTURE1);
+                gl.bindTexture(gl.TEXTURE_2D, shTexture);
+            }
+            
+            u_texture = gl.getUniformLocation(program, "u_texture") as WebGLUniformLocation;
             gl.uniform1i(u_texture, 0);
-            gl.uniform1i(u_shTexture, 1);
             
             gl.activeTexture(gl.TEXTURE0);
             gl.bindTexture(gl.TEXTURE_2D, texture);
-
-            gl.activeTexture(gl.TEXTURE1);
-            gl.bindTexture(gl.TEXTURE_2D, shTexture);
-            
 
             for (const shaderPass of shaderPasses) {
                 shaderPass.init(this, program);
