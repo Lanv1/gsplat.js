@@ -31,7 +31,7 @@ export class WebGLRenderer {
         canvas.style.background = "#000";
         this.domElement = canvas;
 
-        const gl = canvas.getContext("webgl2", { antialias: false }) as WebGL2RenderingContext;
+        const gl = canvas.getContext("webgl2", { antialias: false}) as WebGL2RenderingContext;
         this.gl = gl;
 
         const shaderPasses = optionalShaderPasses || [];
@@ -277,9 +277,13 @@ export class WebGLRenderer {
                 gl.uniform3fv(u_camPos, new Float32Array(activeCamera.position.flat()));
 
                 // console.log("campos: " + activeCamera.position.flat());
+                // gl.colorMask(false, false, false, true);
+                // gl.clearColor(0, 0, 0, 1);
                 gl.clear(gl.COLOR_BUFFER_BIT);
                 gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 4, activeScene.vertexCount);
             } else {
+                // gl.colorMask(false, false, false, true);
+                // gl.clearColor(0, 0, 0, 1);
                 gl.clear(gl.COLOR_BUFFER_BIT);
             }
         };

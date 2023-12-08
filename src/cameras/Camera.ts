@@ -5,6 +5,7 @@ import { Matrix4 } from "../math/Matrix4";
 import { Vector3 } from "../math/Vector3";
 
 class Camera extends Object3D {
+
     fx: number;
     fy: number;
 
@@ -16,7 +17,6 @@ class Camera extends Object3D {
     viewProj: Matrix4;
 
     update: (width: number, height: number) => void;
-
     constructor(
         position = new Vector3(0, 0, -5),
         rotation = new Quaternion(),
@@ -65,8 +65,48 @@ class Camera extends Object3D {
             this.viewMatrix = getViewMatrix();
             this.viewProj = this.projectionMatrix.multiply(this.viewMatrix);
 
-        };
+        };        
     }
+
+    async setFromFile(file: File): Promise<void> {
+       const reader = new FileReader();
+       reader.onload = (e) => {
+           const data = JSON.parse(e.target!.result as string);
+           console.log("data from camera: " + JSON.stringify(data));
+           this.position = new Vector3(data.position.x, data.position.y, data.position.z);
+           this.rotation = new Quaternion(data.rotation.x, data.rotation.y, data.rotation.z, data.rotation.w);
+           this.fx = data.fx;
+           this.fy = data.fy;
+
+           this.update(data.width, data.height);
+       };
+       reader.onprogress = (e) => {
+       };
+       reader.readAsText(file);
+       await new Promise<void>((resolve) => {
+           reader.onloadend = () => {
+               resolve();
+           };
+       });
+    };
+
+    dumpSettings(width: Number, height: Number): void {
+        const data: any = {
+            "id":0,
+            "img_name": "NONE",
+            "width": width,
+            "height": height,
+            "position": this.position,
+            "rotation": this.rotation,
+            "fy": this.fy,
+            "fx": this.fx
+        };
+
+        console.log(JSON.stringify(data));
+
+        console.log("CAM POSITION" + "[" + this.position.x + ", " + this.position.y + ", " + this.position.z + "]");
+    }
+
 }
 
 export { Camera };

@@ -84,7 +84,8 @@ vec3 eval_sh(highp usampler2D tex, int index, uint deg, vec3 dir) {
         }
     }
 
-    return result;
+    result += 0.5;
+    return vec3(max(result.x, 0.), max(result.y, 0.), max(result.z, 0.));
 }
 
 
@@ -147,9 +148,9 @@ void main () {
     //color based on spherical harmonics
     if(u_useShs) {
         const uint deg = 3u;    //degree per gaussian can be set (would have to store it in sh texture padding).
-        vec3 dir = normalize(p - inverse(view)[3].xyz);
-        vec3 col = eval_sh(u_shTexture, index, deg, dir);
-        rgb = (0.5  + col);
+        mat4 inverted_view = inverse(view);
+        vec3 dir = normalize(p - inverted_view[3].xyz);
+        rgb = eval_sh(u_shTexture, index, deg, dir);
         
     } else {
 
