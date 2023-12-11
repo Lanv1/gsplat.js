@@ -276,7 +276,6 @@ export class WebGLRenderer {
                 gl.uniformMatrix4fv(u_view, false, activeCamera.viewMatrix.buffer);
                 gl.uniform3fv(u_camPos, new Float32Array(activeCamera.worldPos.flat()));
 
-                console.log("campos: " + activeCamera.worldPos.flat());
                 // gl.colorMask(false, false, false, true);
                 // gl.clearColor(0, 0, 0, 1);
                 gl.clear(gl.COLOR_BUFFER_BIT);

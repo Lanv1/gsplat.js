@@ -88,25 +88,31 @@ class Camera extends Object3D {
        const reader = new FileReader();
        reader.onload = (e) => {
             const data = JSON.parse(e.target!.result as string);
-            let rots : Float32Array = data.rotation.flat();
-            console.log(rots);
-            let rotmat = new Matrix3(
-                rots[0], rots[1], rots[2], 
-                rots[3],rots[4], rots[5], 
-                rots[6], rots[7], rots[8]
-            );
-            let pos : Float32Array = data.position.flat();
+            if(data.position.x != undefined) {
+                this.position = new Vector3(data.position.x, data.position.y, data.position.z);
+            } else {
+                let pos : Float32Array = data.position;
+                this.position = new Vector3(...pos);
+            }
+            
+            if(data.rotation.x != undefined) {
+                this.rotation = new Quaternion(data.rotation.x, data.rotation.y, data.rotation.z, data.rotation.w);
+            } else {
+                let rots : Float32Array = data.rotation.flat();
+                let rotmat = new Matrix3(...rots);
+                this.rotation = Quaternion.FromMatrix3(rotmat);          
+            }
+            
+            console.log(`camera loaded settings: pos ${this.position.x}, ${this.position.y}, ${this.position.z}`);
+            console.log("rotation: ");
+            console.log(Matrix3.RotationFromQuaternion(this.rotation).buffer);
 
-            this.position = new Vector3(pos[0], pos[1], pos[2]);
             //    this.rotation = new Quaternion(data.rotation.x, data.rotation.y, data.rotation.z, data.rotation.w);
         
-            this.rotation = Quaternion.FromMatrix3(rotmat);
             this.fx = data.fx;
             this.fy = data.fy;
             
             this.update(data.width, data.height);
-            console.log(`camera loaded settings: pos ${this.position.x}, ${this.position.y}`);
-            console.log(Matrix3.RotationFromQuaternion(this.rotation).buffer);
 
        };
        reader.onprogress = (e) => {
@@ -135,6 +141,10 @@ class Camera extends Object3D {
 
         console.log("CAM POSITION" + "[" + this.position.x + ", " + this.position.y + ", " + this.position.z + "]");
         console.log("CAM WORLD POSITION? " + "[" + this.worldPos.x + ", " + this.worldPos.y + ", " + this.worldPos.z + "]");
+        console.log(Matrix3.RotationFromQuaternion(this.rotation).buffer);
+
+        console.log("actual cam viewmatrix: ");
+        console.log(this.viewMatrix.buffer);
     }
 
 }

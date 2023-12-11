@@ -27,6 +27,7 @@ class OrbitControls {
         enableKeyboardControls: boolean = true,
         inputTarget: Vector3 = new Vector3(),
     ) {
+
         let target = inputTarget.clone();
 
         let desiredTarget = target.clone();
@@ -253,7 +254,6 @@ class OrbitControls {
             const z = target.z - radius * Math.cos(alpha) * Math.cos(beta);
             camera.position = new Vector3(x, y, z);
             camera.worldPos = new Vector3(x, y, z);
-
 
             const direction = target.subtract(camera.position).normalize();
             const rx = Math.asin(-direction.y);
