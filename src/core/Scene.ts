@@ -90,6 +90,7 @@ class Scene extends EventDispatcher {
             if(typeof shs != 'undefined') {
                 //padding added
                 this._shs = new Uint32Array(this._width* this._shHeight * 4);
+                console.log(`sh texture size: ${this._width* this._shHeight * 4}`);
             }
 
             const f_buffer = new Float32Array(data.buffer);
@@ -99,18 +100,20 @@ class Scene extends EventDispatcher {
             const data_f = new Float32Array(this._data.buffer);
 
             for (let i = 0; i < this._vertexCount; i++) {
-
+                
                 if(typeof shs != 'undefined') {
                     // pack input F32 shs to H16 inside the scene.
                     for(let j = 0; j < 48; j +=2) {
                         this._shs[shs_ind] = packHalf2x16(shs[i*48+j], shs[i*48+(j+1)]);
                         shs_ind ++;
                     }
+                    shs_ind += 8;
 
-                    for(let j = 0; j < 8; j ++) {
-                        this._shs[shs_ind] = 0;
-                        shs_ind ++;
-                    }
+                    // for(let j = 0; j < 8; j ++) {
+                    //     //padding
+                    //     this._shs[shs_ind] = 0;
+                    //     shs_ind ++;
+                    // }
                 }
 
                 this._positions[3 * i + 0] = f_buffer[8 * i + 0];

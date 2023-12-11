@@ -252,6 +252,8 @@ class OrbitControls {
             const y = target.y - radius * Math.sin(beta);
             const z = target.z - radius * Math.cos(alpha) * Math.cos(beta);
             camera.position = new Vector3(x, y, z);
+            camera.worldPos = new Vector3(x, y, z);
+
 
             const direction = target.subtract(camera.position).normalize();
             const rx = Math.asin(-direction.y);

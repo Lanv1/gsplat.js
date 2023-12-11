@@ -16,9 +16,11 @@ class Camera extends Object3D {
     viewMatrix: Matrix4;
     viewProj: Matrix4;
 
+    worldPos: Vector3;
+
     update: (width: number, height: number) => void;
     constructor(
-        position = new Vector3(0, 0, -5),
+        position = new Vector3(0, 0, 0),
         rotation = new Quaternion(),
         fx = 1132,
         fy = 1132,
@@ -44,6 +46,18 @@ class Camera extends Object3D {
             return new Matrix4(...camToWorld);
         };
 
+        const getViewMatrix2 = (): Matrix4 => {
+            const R = Matrix3.RotationFromQuaternion(this.rotation).buffer;
+            const t = this.position.flat();
+            const camToWorld = [
+                [R[0], R[3], R[6], t[0]],
+                [R[1], R[4], R[7], t[1]],
+                [R[2], R[5], R[8], t[2]],
+                [0, 0, 0, 1]
+            ].flat();
+            return new Matrix4(...camToWorld);
+        };
+
         this.position = position;
         this.rotation = rotation;
         this.fx = fx;
@@ -53,6 +67,7 @@ class Camera extends Object3D {
         this.projectionMatrix = new Matrix4();
         this.viewMatrix = new Matrix4();
         this.viewProj = new Matrix4();
+        this.worldPos = position;
 
         this.update = (width: number, height: number) => {
             // prettier-ignore
@@ -63,6 +78,7 @@ class Camera extends Object3D {
                 0, 0, -(this.far * this.near) / (this.far - this.near), 0
             );
             this.viewMatrix = getViewMatrix();
+            // this.viewMatrix = getViewMatrix2();
             this.viewProj = this.projectionMatrix.multiply(this.viewMatrix);
 
         };        
@@ -71,14 +87,27 @@ class Camera extends Object3D {
     async setFromFile(file: File): Promise<void> {
        const reader = new FileReader();
        reader.onload = (e) => {
-           const data = JSON.parse(e.target!.result as string);
-           console.log("data from camera: " + JSON.stringify(data));
-           this.position = new Vector3(data.position.x, data.position.y, data.position.z);
-           this.rotation = new Quaternion(data.rotation.x, data.rotation.y, data.rotation.z, data.rotation.w);
-           this.fx = data.fx;
-           this.fy = data.fy;
+            const data = JSON.parse(e.target!.result as string);
+            let rots : Float32Array = data.rotation.flat();
+            console.log(rots);
+            let rotmat = new Matrix3(
+                rots[0], rots[1], rots[2], 
+                rots[3],rots[4], rots[5], 
+                rots[6], rots[7], rots[8]
+            );
+            let pos : Float32Array = data.position.flat();
 
-           this.update(data.width, data.height);
+            this.position = new Vector3(pos[0], pos[1], pos[2]);
+            //    this.rotation = new Quaternion(data.rotation.x, data.rotation.y, data.rotation.z, data.rotation.w);
+        
+            this.rotation = Quaternion.FromMatrix3(rotmat);
+            this.fx = data.fx;
+            this.fy = data.fy;
+            
+            this.update(data.width, data.height);
+            console.log(`camera loaded settings: pos ${this.position.x}, ${this.position.y}`);
+            console.log(Matrix3.RotationFromQuaternion(this.rotation).buffer);
+
        };
        reader.onprogress = (e) => {
        };
@@ -105,6 +134,7 @@ class Camera extends Object3D {
         console.log(JSON.stringify(data));
 
         console.log("CAM POSITION" + "[" + this.position.x + ", " + this.position.y + ", " + this.position.z + "]");
+        console.log("CAM WORLD POSITION? " + "[" + this.worldPos.x + ", " + this.worldPos.y + ", " + this.worldPos.z + "]");
     }
 
 }

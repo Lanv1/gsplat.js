@@ -55,8 +55,7 @@ vec3 eval_sh(highp usampler2D tex, int index, uint deg, vec3 dir) {
 
     if(deg > 0u) {
         float x = dir.x, y = dir.y, z = dir.z;
-        result = result - 
-            (SH_C1 * y * vec3(shs[3], shs[4], shs[5])) + 
+        result -= (SH_C1 * y * vec3(shs[3], shs[4], shs[5])) + 
             (SH_C1 * z * vec3(shs[6], shs[7], shs[8])) - 
             (SH_C1 * x * vec3(shs[9], shs[10], shs[11]));
 
@@ -64,16 +63,14 @@ vec3 eval_sh(highp usampler2D tex, int index, uint deg, vec3 dir) {
             float xx = x*x, yy = y*y, zz = z*z;
             float xy = x * y, yz = y * z, xz = x * z;
 
-            result = result +
-                (SH_C2[0] * xy * vec3(shs[12], shs[13], shs[14])) +
+            result += (SH_C2[0] * xy * vec3(shs[12], shs[13], shs[14])) +
                 (SH_C2[1] * yz * vec3(shs[15], shs[16], shs[17])) +
                 (SH_C2[2] * (2.0 * zz - xx - yy) * vec3(shs[18], shs[19], shs[20])) +
                 (SH_C2[3] * xz * vec3(shs[21], shs[22], shs[23])) +
                 (SH_C2[4] * (xx - yy) * vec3(shs[24], shs[25], shs[26]));
 
             if(deg > 2u) {
-                result = result +
-                    (SH_C3[0] * y * (3.0 * xx - yy) * vec3(shs[27], shs[28], shs[29])) +
+                result += (SH_C3[0] * y * (3.0 * xx - yy) * vec3(shs[27], shs[28], shs[29])) +
                     (SH_C3[1] * xy * z * vec3(shs[30], shs[31], shs[32])) +
                     (SH_C3[2] * y * (4.0 * zz - xx - yy)* vec3(shs[33], shs[34], shs[35])) +
                     (SH_C3[3] * z * (2.0 * zz - 3.0 * xx - 3.0 * yy) * vec3(shs[36], shs[37], shs[38])) +
@@ -87,6 +84,54 @@ vec3 eval_sh(highp usampler2D tex, int index, uint deg, vec3 dir) {
     result += 0.5;
     return vec3(max(result.x, 0.), max(result.y, 0.), max(result.z, 0.));
 }
+
+vec3 eval_sh_test(highp usampler2D tex, int index, uint deg, vec3 dir) {
+    float shs[16];
+    uint offsetMask = 0u;
+    uvec4 packedShs = texelFetch(tex, ivec2(((uint(index) & 0xffu) << 3), uint(index) >> 8), 0);
+
+    vec2 s0 = unpackHalf2x16(packedShs.x);
+    vec2 s1 = unpackHalf2x16(packedShs.y);
+    vec2 s2 = unpackHalf2x16(packedShs.z);
+    vec2 s3 = unpackHalf2x16(packedShs.w);
+    
+    shs[0] = s0.x;
+    shs[1] = s0.y;
+    shs[2] = s1.x;
+    shs[3] = s1.y;
+    shs[4] = s2.x;
+    shs[5] = s2.y;
+    shs[6] = s3.x;
+    shs[7] = s3.y;
+
+    uvec4 packedShs1 = texelFetch(tex, ivec2(((uint(index) & 0xffu) << 3) | 1u, uint(index) >> 8), 0);
+
+    vec2 s4 = unpackHalf2x16(packedShs1.x);
+    vec2 s5 = unpackHalf2x16(packedShs1.y);
+    vec2 s6 = unpackHalf2x16(packedShs1.z);
+    vec2 s7 = unpackHalf2x16(packedShs1.w);
+    
+    shs[8] = s4.x;
+    shs[9] = s4.y;
+    shs[10] = s5.x;
+    shs[11] = s5.y;
+    shs[12] = s6.x;
+    shs[13] = s6.y;
+    shs[14] = s7.x;
+    shs[15] = s7.y;
+
+    vec3 result = SH_C0 * vec3(shs[0], shs[1], shs[2]);
+
+    if(deg > 0u) {
+        result -= (SH_C1 * dir.y * vec3(shs[3], shs[4], shs[5])) + 
+                  (SH_C1 * dir.z * vec3(shs[6], shs[7], shs[8])) - 
+                  (SH_C1 * dir.x * vec3(shs[9], shs[10], shs[11]));
+    }
+
+    result += 0.5;
+    return vec3(max(result.x, 0.), max(result.y, 0.), max(result.z, 0.));
+}
+
 
 
 uniform highp usampler2D u_texture;
@@ -108,7 +153,6 @@ out vec4 vColor;
 out vec2 vPosition;
 
 void main () {
-
     uvec4 cen = texelFetch(u_texture, ivec2((uint(index) & 0x3ffu) << 1, uint(index) >> 10), 0);
     vec3 p = uintBitsToFloat(cen.xyz);
     vec4 cam = view * vec4(p, 1);
@@ -143,13 +187,14 @@ void main () {
     vec2 minorAxis = min(sqrt(2.0 * lambda2), 1024.0) * vec2(diagonalVector.y, -diagonalVector.x);
 
     vec3 rgb;
-    float opacity = float(((cov.w >> 24) & 0xffu)) / 255.0;
+    float opacity = float((cov.w >> 24) & 0xffu) / 255.0;
 
     //color based on spherical harmonics
     if(u_useShs) {
         const uint deg = 3u;    //degree per gaussian can be set (would have to store it in sh texture padding).
         mat4 inverted_view = inverse(view);
-        vec3 dir = normalize(p - inverted_view[3].xyz);
+        vec3 cp = vec3(camPos.x, -camPos.y, camPos.z);
+        vec3 dir = normalize(p - cp);
         rgb = eval_sh(u_shTexture, index, deg, dir);
         
     } else {
