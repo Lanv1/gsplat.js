@@ -86,46 +86,22 @@ vec3 eval_sh(highp usampler2D tex, int index, uint deg, vec3 dir) {
 }
 
 vec3 eval_sh_test(highp usampler2D tex, int index, uint deg, vec3 dir) {
-    float shs[16];
-    uint offsetMask = 0u;
-    uvec4 packedShs = texelFetch(tex, ivec2(((uint(index) & 0xffu) << 3), uint(index) >> 8), 0);
+    uvec4 sh0ui = texelFetch(tex, ivec2(((uint(index) & 0xffu) << 3), uint(index) >> 8), 0);
+    uvec4 sh1ui = texelFetch(tex, ivec2(((uint(index) & 0xffu) << 3) | 1u, uint(index) >> 8), 0);
+    uvec4 sh2ui = texelFetch(tex, ivec2(((uint(index) & 0xffu) << 3) | 2u, uint(index) >> 8), 0);
+    uvec4 sh3ui = texelFetch(tex, ivec2(((uint(index) & 0xffu) << 3) | 3u, uint(index) >> 8), 0);
 
-    vec2 s0 = unpackHalf2x16(packedShs.x);
-    vec2 s1 = unpackHalf2x16(packedShs.y);
-    vec2 s2 = unpackHalf2x16(packedShs.z);
-    vec2 s3 = unpackHalf2x16(packedShs.w);
-    
-    shs[0] = s0.x;
-    shs[1] = s0.y;
-    shs[2] = s1.x;
-    shs[3] = s1.y;
-    shs[4] = s2.x;
-    shs[5] = s2.y;
-    shs[6] = s3.x;
-    shs[7] = s3.y;
+    vec3 sh0 = uintBitsToFloat(sh0ui.xyz);
+    vec3 sh1 = uintBitsToFloat(sh1ui.xyz);
+    vec3 sh2 = uintBitsToFloat(sh2ui.xyz);
+    vec3 sh3 = uintBitsToFloat(sh3ui.xyz);
 
-    uvec4 packedShs1 = texelFetch(tex, ivec2(((uint(index) & 0xffu) << 3) | 1u, uint(index) >> 8), 0);
-
-    vec2 s4 = unpackHalf2x16(packedShs1.x);
-    vec2 s5 = unpackHalf2x16(packedShs1.y);
-    vec2 s6 = unpackHalf2x16(packedShs1.z);
-    vec2 s7 = unpackHalf2x16(packedShs1.w);
-    
-    shs[8] = s4.x;
-    shs[9] = s4.y;
-    shs[10] = s5.x;
-    shs[11] = s5.y;
-    shs[12] = s6.x;
-    shs[13] = s6.y;
-    shs[14] = s7.x;
-    shs[15] = s7.y;
-
-    vec3 result = SH_C0 * vec3(shs[0], shs[1], shs[2]);
+    vec3 result = SH_C0 * sh0;
 
     if(deg > 0u) {
-        result -= (SH_C1 * dir.y * vec3(shs[3], shs[4], shs[5])) + 
-                  (SH_C1 * dir.z * vec3(shs[6], shs[7], shs[8])) - 
-                  (SH_C1 * dir.x * vec3(shs[9], shs[10], shs[11]));
+        result -= (SH_C1 * dir.y * sh1) + 
+                  (SH_C1 * dir.z * sh2) - 
+                  (SH_C1 * dir.x * sh3);
     }
 
     result += 0.5;
@@ -191,10 +167,10 @@ void main () {
 
     //color based on spherical harmonics
     if(u_useShs) {
-        const uint deg = 3u;    //degree per gaussian can be set (would have to store it in sh texture padding).
+        const uint deg = 1u;    //degree per gaussian can be set (would have to store it in sh texture padding).
         mat4 inverted_view = inverse(view);
-        vec3 cp = vec3(camPos.x, -camPos.y, camPos.z);
-        vec3 dir = normalize(p - cp);
+        vec3 cp = vec3(2.404566365054245, -1.5126823704300492, 1.8822180372091366); // counter scene cam 6 position
+        vec3 dir = normalize(p - inverted_view[3].xyz);
         rgb = eval_sh(u_shTexture, index, deg, dir);
         
     } else {

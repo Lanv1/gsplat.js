@@ -7,8 +7,12 @@ const controls = new SPLAT.OrbitControls(camera, renderer.domElement);
 
 const camFileElem = document.getElementById("input_cam");
 const exportBtnElem = document.getElementById("exportBtn");
+const camSelectorBtnElem = document.getElementById("camSelector");
+let camSelectorLabelElem = document.getElementById("selectedCam");
 
 let loading = false;
+let selectedCam = 0;
+let cameras : any;
 
 async function selectFile(file: File) {
     if (loading) return;
@@ -39,7 +43,21 @@ async function main() {
         const input = event.target as HTMLInputElement;
         if(input.files && input.files.length) {
             const file = input.files[0];
-            camera.setFromFile(file);
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                cameras = JSON.parse(e.target!.result as string);
+                camera.setFromData(cameras[selectedCam]);
+            };
+            reader.onprogress = (e) => {
+            };
+            reader.readAsText(file);
+            new Promise<void>((resolve) => {
+                reader.onloadend = () => {
+                    resolve();
+                };
+            });
+            
+            (camSelectorLabelElem as HTMLInputElement).value = "0";
         }
     });
 
@@ -48,9 +66,27 @@ async function main() {
         camera.dumpSettings(renderer.domElement.width, renderer.domElement.height);
     });
 
+    camSelectorBtnElem?.addEventListener("click", (event: Event) => {
+        console.log("next cam clicked");
+        const nbCam = cameras.length;
+        selectedCam = (selectedCam + 1) % nbCam;
+
+        camera.setFromData(cameras[selectedCam]);
+        (camSelectorLabelElem as HTMLInputElement).value = selectedCam.toString();
+    });
+
+    camSelectorLabelElem?.addEventListener("input", (event: Event) => {
+        const val : number = parseInt((event.target  as HTMLInputElement).value);
+
+        if (val < cameras.length) {
+            selectedCam = val;
+            camera.setFromData(cameras[selectedCam]);
+        }
+    });
+
     // Render loop
     const frame = () => {
-        controls.update();
+        // controls.update();
         renderer.render(scene, camera);
 
         requestAnimationFrame(frame);

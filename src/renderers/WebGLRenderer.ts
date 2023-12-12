@@ -149,8 +149,6 @@ export class WebGLRenderer {
             u_view = gl.getUniformLocation(program, "view") as WebGLUniformLocation;
             gl.uniformMatrix4fv(u_view, false, activeCamera.viewMatrix.buffer);
 
-
-
             const triangleVertices = new Float32Array([-2, -2, 2, -2, 2, 2, -2, 2]);
             vertexBuffer = gl.createBuffer() as WebGLBuffer;
             gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
@@ -274,7 +272,6 @@ export class WebGLRenderer {
                     shaderPass.render();
                 }
                 gl.uniformMatrix4fv(u_view, false, activeCamera.viewMatrix.buffer);
-                gl.uniform3fv(u_camPos, new Float32Array(activeCamera.worldPos.flat()));
 
                 // gl.colorMask(false, false, false, true);
                 // gl.clearColor(0, 0, 0, 1);

@@ -262,6 +262,12 @@ class PLYLoader {
             offset: number;
         };
 
+        let minSh = new Float32Array(48);
+        let maxSh = new Float32Array(48);
+
+        let minDc = new Float32Array(3);
+        let maxDc = new Float32Array(3);
+
         const shRowLength = 4 * ((1*3) + (15*3)); //diffuse + 3 degrees of spherical harmonics in bytes
 
         const ubuf = new Uint8Array(inputBuffer);
@@ -330,6 +336,10 @@ class PLYLoader {
                     //spherical harmonics coefficients
                     const index = 3 + parseInt(property.name.split("_").slice(-1)[0])
                     sh[index] = value;
+                    
+                    minSh[index] = value < minSh[index] ? value : minSh[index];
+                    maxSh[index] = value > maxSh[index] ? value : maxSh[index];
+
                 }
 
                 switch (property.name) {
@@ -363,14 +373,20 @@ class PLYLoader {
                     case "f_dc_0":
                         rgba[0] = (0.5 + this.SH_C0 * value) * 255;
                         sh[0] = value;
+                        minDc[0] = value < minDc[0] ? value : minDc[0]; 
+                        maxDc[0] = value > maxDc[0] ? value : maxDc[0]; 
                         break;
                         case "f_dc_1":
                         rgba[1] = (0.5 + this.SH_C0 * value) * 255;
                         sh[1] = value;
+                        minDc[1] = value < minDc[1] ? value : minDc[1];
+                        maxDc[1] = value > maxDc[1] ? value : maxDc[1];
                         break;
                         case "f_dc_2":
                         rgba[2] = (0.5 + this.SH_C0 * value) * 255;
                         sh[2] = value;
+                        minDc[2] = value < minDc[2] ? value : minDc[2];
+                        maxDc[2] = value > maxDc[2] ? value : maxDc[2];
                         break;
                     case "f_dc_3":
                         rgba[3] = (0.5 + this.SH_C0 * value) * 255;
@@ -416,6 +432,13 @@ class PLYLoader {
             rot[3] = q.z * 128 + 128;
         }
 
+        console.log(`min dc: ${minDc[0]}, ${minDc[1]}, ${minDc[2]}`);
+        console.log(`max dc: ${maxDc[0]}, ${maxDc[1]}, ${maxDc[2]}`);
+
+        for(let i = 0; i < 48; i ++)
+        {
+            console.log(`sh[${i}] is in [${minSh[i]}, ${maxSh[i]}]`);
+        }
         return [dataBuffer, shsBuffer];
     }
 }
