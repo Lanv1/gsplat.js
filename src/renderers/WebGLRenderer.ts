@@ -17,6 +17,8 @@ export class WebGLRenderer {
     render: (scene: Scene, camera: Camera) => void;
     dispose: () => void;
 
+    setCameraBuffers: () => void;
+
     constructor(optionalCanvas: HTMLCanvasElement | null = null, optionalShaderPasses: ShaderPass[] | null = null) {
         const canvas: HTMLCanvasElement = optionalCanvas || document.createElement("canvas");
         if (!optionalCanvas) {
@@ -38,6 +40,8 @@ export class WebGLRenderer {
         if (!optionalShaderPasses) {
             shaderPasses.push(new FadeInPass());
         }
+
+        let camChanged: boolean = false;
 
         let activeScene: Scene;
         let activeCamera: Camera;
@@ -110,7 +114,8 @@ export class WebGLRenderer {
                 console.error(gl.getShaderInfoLog(vertexShader));
             }
 
-            gl.getParameter(gl.MAX_VERTEX_ATTRIBS)
+            gl.getParameter(gl.MAX_VERTEX_ATTRIBS);
+
             fragmentShader = gl.createShader(gl.FRAGMENT_SHADER) as WebGLShader;
             gl.shaderSource(fragmentShader, frag);
             gl.compileShader(fragmentShader);
@@ -246,22 +251,33 @@ export class WebGLRenderer {
         };
 
         this.render = (scene: Scene, camera: Camera) => {
-            if (scene !== activeScene || camera !== activeCamera) {
-                if (initialized) {
-                    this.dispose();
-                }
+            if(camera !== activeCamera)
+                camChanged = true;
 
+            if (scene !== activeScene || camChanged) {
+                
+                // activeCamera = camera;
+                // this.setCameraBuffers();
+                
                 activeCamera = camera;
-
+                
                 if (scene !== activeScene) {
+                    if (initialized) {
+                        this.dispose();
+                    }
                     if (activeScene) {
                         activeScene.removeEventListener("change", onSceneChange);
                     }
                     activeScene = scene;
                     activeScene.addEventListener("change", onSceneChange);
+                    initWebGL();
                 }
 
-                initWebGL();
+                if(camChanged) {
+                    camChanged = false;
+                    this.setCameraBuffers();
+                } 
+                
             }
 
             activeCamera.update(canvas.width, canvas.height);
@@ -297,7 +313,18 @@ export class WebGLRenderer {
 
             initialized = false;
         };
+        
+        this.setCameraBuffers = () => {
+            activeCamera.update(canvas.width, canvas.height);
+
+            // gl.uniformMatrix4fv(u_projection, false, activeCamera.projectionMatrix.buffer);
+            // gl.uniform3fv(u_camPos, new Float32Array(activeCamera.position.flat()));
+            // gl.uniform2fv(u_focal, new Float32Array([activeCamera.fx, activeCamera.fy]));
+            gl.uniformMatrix4fv(u_view, false, activeCamera.viewMatrix.buffer);
+        };
 
         this.resize();
     }
+
+
 }

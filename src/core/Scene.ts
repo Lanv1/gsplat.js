@@ -110,17 +110,6 @@ class Scene extends EventDispatcher {
                         shs_ind ++;
                     }
                     shs_ind += 8;
-
-                    //test without packing: send diffuse + first band: 4 vec3+pad 1F
-                    // for(let j = 0; j < 4; j ++) {
-                    //     shs_f[shs_ind] = shs[i*48 + (j*3)];
-                    //     shs_f[shs_ind+1] = shs[i*48 + (j*3)+1];
-                    //     shs_f[shs_ind+2] = shs[i*48 + (j*3)+2];
-                    //     shs_f[shs_ind+3] = 0; //pad
-                    //     shs_ind += 4;
-                    // }
-
-                    // shs_ind += 16;
                 }
 
                 this._positions[3 * i + 0] = f_buffer[8 * i + 0];

@@ -113,13 +113,6 @@ class Camera extends Object3D {
     }
 
     setFromData(data: any): void {
-        if(data.position.x != undefined) {
-            this.position = new Vector3(data.position.x, data.position.y, data.position.z);
-        } else {
-            let pos : Float32Array = data.position;
-            this.position = new Vector3(...pos);
-        }
-        
         if(data.rotation.x != undefined) {
             this.rotation = new Quaternion(data.rotation.x, data.rotation.y, data.rotation.z, data.rotation.w);
         } else {
@@ -128,13 +121,22 @@ class Camera extends Object3D {
             this.rotation = Quaternion.FromMatrix3(rotmat);          
         }
         
+        if(data.position.x != undefined) {
+            this.position = new Vector3(data.position.x, data.position.y, data.position.z);
+        } else {
+            let pos : Float32Array = data.position;
+            this.position = new Vector3(...pos);
+        }
+        
+        
         console.log(`camera loaded settings: pos ${this.position.x}, ${this.position.y}, ${this.position.z}`);
         console.log("rotation: ");
         console.log(Matrix3.RotationFromQuaternion(this.rotation).buffer);
-    
+        
         this.fx = data.fx;
         this.fy = data.fy;
-
+        
+        let newCam = new Camera()
         
         let mat90z = Matrix3.RotationFromEuler(new Vector3(0., 0., Math.PI/2.));
         console.log(mat90z.buffer);
@@ -146,6 +148,35 @@ class Camera extends Object3D {
         console.log(mat90y.buffer); 
 
         this.update(data.width, data.height);
+    }
+
+    static fromData(data: any): Camera {
+        let position = new Vector3();
+        let rotation = new Quaternion();
+
+        if(data.position.x != undefined) {
+            position = new Vector3(data.position.x, data.position.y, data.position.z);
+        } else {
+            let pos : Float32Array = data.position;
+            position = new Vector3(...pos);
+        }
+        
+        if(data.rotation.x != undefined) {
+            rotation = new Quaternion(data.rotation.x, data.rotation.y, data.rotation.z, data.rotation.w);
+        } else {
+            let rots : Float32Array = data.rotation.flat();
+            let rotmat = new Matrix3(...rots);
+            rotation = Quaternion.FromMatrix3(rotmat);          
+        }
+        
+        console.log(`camera created with settings: pos ${position.x}, ${position.y}, ${position.z}`);
+        console.log("rotation: ");
+        console.log(Matrix3.RotationFromQuaternion(rotation).buffer);
+        
+        let newCam = new Camera(position, rotation, data.fx, data.fy);
+        newCam.update(data.width, data.height);
+
+        return newCam;
     }
 
     dumpSettings(width: Number, height: Number): void {

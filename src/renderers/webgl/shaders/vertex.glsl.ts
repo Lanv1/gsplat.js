@@ -86,8 +86,10 @@ vec3 eval_sh(highp usampler2D tex, int index, uint deg, vec3 dir) {
 }
 
 vec3 eval_sh_test(highp usampler2D tex, int index, uint deg, vec3 dir) {
-    uvec4 sh0ui = texelFetch(tex, ivec2(((uint(index) & 0xffu) << 3), uint(index) >> 8), 0);
-    uvec4 sh1ui = texelFetch(tex, ivec2(((uint(index) & 0xffu) << 3) | 1u, uint(index) >> 8), 0);
+    uvec4 sh0ui = texelFetch(tex, ivec2((index % 256) * 8 , index / 256), 0);
+    uvec4 sh1ui = texelFetch(tex, ivec2(((index % 256) * 8) + 1 , index / 256), 0);
+    // uvec4 sh0ui = texelFetch(tex, ivec2(((uint(index) & 0xffu) << 3), uint(index) >> 8), 0);
+    // uvec4 sh1ui = texelFetch(tex, ivec2(((uint(index) & 0xffu) << 3) + 1u, uint(index) >> 8), 0);
     uvec4 sh2ui = texelFetch(tex, ivec2(((uint(index) & 0xffu) << 3) | 2u, uint(index) >> 8), 0);
     uvec4 sh3ui = texelFetch(tex, ivec2(((uint(index) & 0xffu) << 3) | 3u, uint(index) >> 8), 0);
 
@@ -96,6 +98,9 @@ vec3 eval_sh_test(highp usampler2D tex, int index, uint deg, vec3 dir) {
     vec3 sh2 = uintBitsToFloat(sh2ui.xyz);
     vec3 sh3 = uintBitsToFloat(sh3ui.xyz);
 
+    //custom value: return sh components of 1st band
+
+    // return sh1;
     vec3 result = SH_C0 * sh0;
 
     if(deg > 0u) {
@@ -167,9 +172,8 @@ void main () {
 
     //color based on spherical harmonics
     if(u_useShs) {
-        const uint deg = 1u;    //degree per gaussian can be set (would have to store it in sh texture padding).
+        const uint deg = 3u;    //degree per gaussian can be set (would have to store it in sh texture padding).
         mat4 inverted_view = inverse(view);
-        vec3 cp = vec3(2.404566365054245, -1.5126823704300492, 1.8822180372091366); // counter scene cam 6 position
         vec3 dir = normalize(p - inverted_view[3].xyz);
         rgb = eval_sh(u_shTexture, index, deg, dir);
         

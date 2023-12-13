@@ -2,8 +2,8 @@ import * as SPLAT from "../../../dist/index";
 
 const renderer = new SPLAT.WebGLRenderer();
 const scene = new SPLAT.Scene();
-const camera = new SPLAT.Camera();
-const controls = new SPLAT.OrbitControls(camera, renderer.domElement);
+let camera = new SPLAT.Camera();
+let controls = new SPLAT.OrbitControls(camera, renderer.domElement);
 
 const camFileElem = document.getElementById("input_cam");
 const exportBtnElem = document.getElementById("exportBtn");
@@ -46,7 +46,9 @@ async function main() {
             const reader = new FileReader();
             reader.onload = (e) => {
                 cameras = JSON.parse(e.target!.result as string);
-                camera.setFromData(cameras[selectedCam]);
+                // camera.setFromData(cameras[selectedCam]);
+
+                camera = SPLAT.Camera.fromData(cameras[selectedCam]);
             };
             reader.onprogress = (e) => {
             };
@@ -71,7 +73,9 @@ async function main() {
         const nbCam = cameras.length;
         selectedCam = (selectedCam + 1) % nbCam;
 
-        camera.setFromData(cameras[selectedCam]);
+        // camera.setFromData(cameras[selectedCam]);
+        camera = SPLAT.Camera.fromData(cameras[selectedCam]);
+
         (camSelectorLabelElem as HTMLInputElement).value = selectedCam.toString();
     });
 
@@ -86,7 +90,7 @@ async function main() {
 
     // Render loop
     const frame = () => {
-        // controls.update();
+        controls.update();
         renderer.render(scene, camera);
 
         requestAnimationFrame(frame);

@@ -88,7 +88,12 @@ class PLYLoader {
 
                 console.log("setting the data in textures took " + (after - before) + " ms.");
             } else {
+                let before = performance.now();
                 const data = new Uint8Array(this._ParsePLYBuffer(e.target!.result as ArrayBuffer, format));
+                let after = performance.now();
+
+                console.log("PLY file loading took " + (after - before) + " ms. (no shs)");
+
                 scene.setData(data);
             }
         };
@@ -334,79 +339,79 @@ class PLYLoader {
 
                 if(property.name.startsWith("f_rest")) {
                     //spherical harmonics coefficients
-                    const index = 3 + parseInt(property.name.split("_").slice(-1)[0])
+                    let n = parseInt(property.name.split("_").slice(-1)[0])
+                    const index = 3 + ((n % 15)*3 + (n / 15));
                     sh[index] = value;
-                    
-                    minSh[index] = value < minSh[index] ? value : minSh[index];
-                    maxSh[index] = value > maxSh[index] ? value : maxSh[index];
 
+                } else {
+
+                    switch (property.name) {
+                        case "x":
+                            position[0] = value;
+                            break;
+                        case "y":
+                            position[1] = value;
+                            break;
+                        case "z":
+                            position[2] = value;
+                            break;
+                        case "scale_0":
+                            scale[0] = Math.exp(value);
+                            break;
+                        case "scale_1":
+                            scale[1] = Math.exp(value);
+                            break;
+                        case "scale_2":
+                            scale[2] = Math.exp(value);
+                            break;
+                        case "red":
+                            rgba[0] = value;
+                            break;
+                        case "green":
+                            rgba[1] = value;
+                            break;
+                        case "blue":
+                            rgba[2] = value;
+                            break;
+                        case "f_dc_0":
+                            rgba[0] = (0.5 + this.SH_C0 * value) * 255;
+                            sh[0] = value;
+                            minDc[0] = value < minDc[0] ? value : minDc[0]; 
+                            maxDc[0] = value > maxDc[0] ? value : maxDc[0]; 
+                            break;
+                            case "f_dc_1":
+                            rgba[1] = (0.5 + this.SH_C0 * value) * 255;
+                            sh[1] = value;
+                            minDc[1] = value < minDc[1] ? value : minDc[1];
+                            maxDc[1] = value > maxDc[1] ? value : maxDc[1];
+                            break;
+                            case "f_dc_2":
+                            rgba[2] = (0.5 + this.SH_C0 * value) * 255;
+                            sh[2] = value;
+                            minDc[2] = value < minDc[2] ? value : minDc[2];
+                            maxDc[2] = value > maxDc[2] ? value : maxDc[2];
+                            break;
+                        case "f_dc_3":
+                            rgba[3] = (0.5 + this.SH_C0 * value) * 255;
+                            break;
+                        case "opacity":
+                            rgba[3] = (1 / (1 + Math.exp(-value))) * 255;
+                            break;
+                        case "rot_0":
+                            r0 = value;
+                            break;
+                        case "rot_1":
+                            r1 = value;
+                            break;
+                        case "rot_2":
+                            r2 = value;
+                            break;
+                        case "rot_3":
+                            r3 = value;
+                            break;
+                    }
                 }
 
-                switch (property.name) {
-                    case "x":
-                        position[0] = value;
-                        break;
-                    case "y":
-                        position[1] = value;
-                        break;
-                    case "z":
-                        position[2] = value;
-                        break;
-                    case "scale_0":
-                        scale[0] = Math.exp(value);
-                        break;
-                    case "scale_1":
-                        scale[1] = Math.exp(value);
-                        break;
-                    case "scale_2":
-                        scale[2] = Math.exp(value);
-                        break;
-                    case "red":
-                        rgba[0] = value;
-                        break;
-                    case "green":
-                        rgba[1] = value;
-                        break;
-                    case "blue":
-                        rgba[2] = value;
-                        break;
-                    case "f_dc_0":
-                        rgba[0] = (0.5 + this.SH_C0 * value) * 255;
-                        sh[0] = value;
-                        minDc[0] = value < minDc[0] ? value : minDc[0]; 
-                        maxDc[0] = value > maxDc[0] ? value : maxDc[0]; 
-                        break;
-                        case "f_dc_1":
-                        rgba[1] = (0.5 + this.SH_C0 * value) * 255;
-                        sh[1] = value;
-                        minDc[1] = value < minDc[1] ? value : minDc[1];
-                        maxDc[1] = value > maxDc[1] ? value : maxDc[1];
-                        break;
-                        case "f_dc_2":
-                        rgba[2] = (0.5 + this.SH_C0 * value) * 255;
-                        sh[2] = value;
-                        minDc[2] = value < minDc[2] ? value : minDc[2];
-                        maxDc[2] = value > maxDc[2] ? value : maxDc[2];
-                        break;
-                    case "f_dc_3":
-                        rgba[3] = (0.5 + this.SH_C0 * value) * 255;
-                        break;
-                    case "opacity":
-                        rgba[3] = (1 / (1 + Math.exp(-value))) * 255;
-                        break;
-                    case "rot_0":
-                        r0 = value;
-                        break;
-                    case "rot_1":
-                        r1 = value;
-                        break;
-                    case "rot_2":
-                        r2 = value;
-                        break;
-                    case "rot_3":
-                        r3 = value;
-                        break;
-                }
             });
 
             let q = new Quaternion(r1, r2, r3, r0);
@@ -432,13 +437,6 @@ class PLYLoader {
             rot[3] = q.z * 128 + 128;
         }
 
-        console.log(`min dc: ${minDc[0]}, ${minDc[1]}, ${minDc[2]}`);
-        console.log(`max dc: ${maxDc[0]}, ${maxDc[1]}, ${maxDc[2]}`);
-
-        for(let i = 0; i < 48; i ++)
-        {
-            console.log(`sh[${i}] is in [${minSh[i]}, ${maxSh[i]}]`);
-        }
         return [dataBuffer, shsBuffer];
     }
 }
