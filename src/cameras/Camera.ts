@@ -86,26 +86,6 @@ class Camera extends Object3D {
                 0, 0, this.far / (this.far - this.near), 1,
                 0, 0, -(this.far * this.near) / (this.far - this.near), 0
             );
-
-            // let fovX = 2*Math.atan(width/(2*fx));
-            // let fovY = 2*Math.atan(height/(2*fy));
-
-            // let tanHalfFovY = Math.tan((fovY / 2));
-            // let tanHalfFovX = Math.tan((fovX / 2));
-        
-            // let top = tanHalfFovY * this.near;
-            // let bottom = -top;
-            // let right = tanHalfFovX * this.near;
-            // let left = -right;
-            // let z_sign = 1.0;
-
-            // this.projectionMatrix = new Matrix4(
-            //     2 * near / (right - left), 0, (right + left) / (right - left), 0,
-            //     0, 2 * near / (top - bottom), (top + bottom) / (top - bottom), 0,
-            //     0, 0, z_sign * far / (far - near), -(far * near) / (far - near),
-            //     0, 0, z_sign, 0
-            // );
-            // this.viewMatrix = getViewMatrix2();
             this.viewMatrix = getViewMatrix();
             this.viewProj = this.projectionMatrix.multiply(this.viewMatrix);
 

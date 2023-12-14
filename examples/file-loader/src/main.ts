@@ -49,6 +49,9 @@ async function main() {
                 // camera.setFromData(cameras[selectedCam]);
 
                 camera = SPLAT.Camera.fromData(cameras[selectedCam]);
+                controls.setCamera(camera);
+                // controls = new SPLAT.OrbitControls(camera, renderer.domElement);
+                // controls.setCameraTarget(camera.position);
             };
             reader.onprogress = (e) => {
             };
@@ -67,24 +70,27 @@ async function main() {
         console.log("export clicked");
         camera.dumpSettings(renderer.domElement.width, renderer.domElement.height);
     });
-
+    
     camSelectorBtnElem?.addEventListener("click", (event: Event) => {
         console.log("next cam clicked");
         const nbCam = cameras.length;
         selectedCam = (selectedCam + 1) % nbCam;
-
+        
         // camera.setFromData(cameras[selectedCam]);
         camera = SPLAT.Camera.fromData(cameras[selectedCam]);
+        controls.setCamera(camera);
 
+        
         (camSelectorLabelElem as HTMLInputElement).value = selectedCam.toString();
     });
-
+    
     camSelectorLabelElem?.addEventListener("input", (event: Event) => {
         const val : number = parseInt((event.target  as HTMLInputElement).value);
-
+        
         if (val < cameras.length) {
             selectedCam = val;
-            camera.setFromData(cameras[selectedCam]);
+            camera = SPLAT.Camera.fromData(cameras[selectedCam]);
+            controls.setCamera(camera);        
         }
     });
 

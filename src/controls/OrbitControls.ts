@@ -18,6 +18,8 @@ class OrbitControls {
     update: () => void;
     dispose: () => void;
 
+    setCamera: (cam: Camera) => void;
+
     constructor(
         inputCamera: Camera,
         domElement: HTMLElement,
@@ -46,6 +48,8 @@ class OrbitControls {
         let camera: Camera | null = null;
         let isUpdatingCamera = false;
 
+        let staticCam = false;
+
         const onCameraChange = () => {
             if (!camera || isUpdatingCamera) return;
 
@@ -59,6 +63,17 @@ class OrbitControls {
 
             desiredTarget = new Vector3(x, y, z);
         };
+
+        this.setCamera = (newCamera: Camera) => {
+            this.attach(newCamera);
+            staticCam = true;
+
+            dragging = false;
+            panning = false;
+            lastDist = 0;
+            lastX = 0;
+            lastY = 0;
+        }
 
         this.attach = (newCamera: Camera) => {
             if (camera) {
@@ -93,6 +108,8 @@ class OrbitControls {
         };
 
         const onKeyDown = (e: KeyboardEvent) => {
+            staticCam = false;
+
             keys[e.code] = true;
             // Map arrow keys to WASD keys
             if (e.code === "ArrowUp") keys["KeyW"] = true;
@@ -155,6 +172,10 @@ class OrbitControls {
 
             lastX = e.clientX;
             lastY = e.clientY;
+
+            if(dx !== 0 || dy !== 0)
+                staticCam = false;
+            
         };
 
         const onWheel = (e: WheelEvent) => {
@@ -240,7 +261,7 @@ class OrbitControls {
         };
 
         this.update = () => {
-            if (!camera) return;
+            if (!camera || staticCam) return;
 
             isUpdatingCamera = true;
 
@@ -248,6 +269,7 @@ class OrbitControls {
             beta = lerp(beta, desiredBeta, this.dampening);
             radius = lerp(radius, desiredRadius, this.dampening);
             target = target.lerp(desiredTarget, this.dampening);
+
 
             const x = target.x + radius * Math.sin(alpha) * Math.cos(beta);
             const y = target.y - radius * Math.sin(beta);

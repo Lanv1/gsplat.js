@@ -220,6 +220,8 @@ export class WebGLRenderer {
 
                 gl.activeTexture(gl.TEXTURE1);
                 gl.bindTexture(gl.TEXTURE_2D, shTexture);
+
+                console.log(`sh texture size: 2048x${activeScene.shHeight}`);
             }
             
             u_texture = gl.getUniformLocation(program, "u_texture") as WebGLUniformLocation;
@@ -255,9 +257,6 @@ export class WebGLRenderer {
                 camChanged = true;
 
             if (scene !== activeScene || camChanged) {
-                
-                // activeCamera = camera;
-                // this.setCameraBuffers();
                 
                 activeCamera = camera;
                 
