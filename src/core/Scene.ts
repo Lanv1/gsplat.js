@@ -90,7 +90,6 @@ class Scene extends EventDispatcher {
             if(typeof shs != 'undefined') {
                 //padding added
                 this._shs = new Uint32Array(this._width* this._shHeight * 4);
-                console.log(`sh texture size: ${this._width* this._shHeight * 4}`);
             }
 
             const f_buffer = new Float32Array(data.buffer);

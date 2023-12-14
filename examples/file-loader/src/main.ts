@@ -7,12 +7,24 @@ let controls = new SPLAT.OrbitControls(camera, renderer.domElement);
 
 const camFileElem = document.getElementById("input_cam");
 const exportBtnElem = document.getElementById("exportBtn");
+const screenshotBtnElem = document.getElementById("screenshot");
 const camSelectorBtnElem = document.getElementById("camSelector");
 let camSelectorLabelElem = document.getElementById("selectedCam");
 
 let loading = false;
 let selectedCam = 0;
 let cameras : any;
+let captureFrame = false;
+
+function downloadCanvasAsImage(event: Event)
+{
+    // open canvas as image in new window
+    // canvas.toBlob((blob : any) => window.open(URL.createObjectURL(blob), '_blank'));
+
+    const target = new Image();
+    target.src = renderer.domElement.toDataURL();
+    renderer.domElement.appendChild(target);
+}
 
 async function selectFile(file: File) {
     if (loading) return;
@@ -94,11 +106,24 @@ async function main() {
         }
     });
 
+    screenshotBtnElem?.addEventListener("click", (ev: Event) => { 
+        renderer.render(scene, camera);
+        renderer.domElement.toBlob((blob : any) =>  window.open(URL.createObjectURL(blob), '_blank'));
+        
+    });
+
     // Render loop
     const frame = () => {
         controls.update();
         renderer.render(scene, camera);
 
+        // if(captureFrame) {
+        //     captureFrame = false;
+        //     const dataURL = renderer.domElement.toDataURL("image/png", 1.0);
+        //     window.open(dataURL, '_blank')
+        //     // renderer.domElement.toBlob((blob : any) => window.open(URL.createObjectURL(dataURL), '_blank'));
+            
+        // }
         requestAnimationFrame(frame);
     };
 
