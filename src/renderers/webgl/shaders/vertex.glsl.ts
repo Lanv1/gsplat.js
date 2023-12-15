@@ -26,30 +26,48 @@ const float SH_C3[7] = float[](
     -0.5900435899266435
 );
 
+// from the packed 8 + 8 floats (from one channel) fill in the shs (layout(rgb, rgb, ...., rgb))
+void fill_sh_from_packed(in uvec4 packed0, in uvec4 packed1, in int offset, inout float shs[48]) {
+    float sorted[16];
 
-vec3 eval_sh(highp usampler2D tex, int index, uint deg, vec3 dir) {
-    uvec4 packedShs;
-    float shs[48];
-    uint offsetMask = 0u;
-    
-    for(int i = 0; i < 6; i ++) {
-        offsetMask = uint(i);
-        packedShs = texelFetch(tex, ivec2(((uint(index) & 0xffu) << 3) | offsetMask, uint(index) >> 8), 0);
-        
-        vec2 s0 = unpackHalf2x16(packedShs.x);
-        vec2 s1 = unpackHalf2x16(packedShs.y);
-        vec2 s2 = unpackHalf2x16(packedShs.z);
-        vec2 s3 = unpackHalf2x16(packedShs.w);
-        
-        shs[i*8] = s0.x;
-        shs[i*8+1] = s0.y;
-        shs[i*8+2] = s1.x;
-        shs[i*8+3] = s1.y;
-        shs[i*8+4] = s2.x;
-        shs[i*8+5] = s2.y;
-        shs[i*8+6] = s3.x;
-        shs[i*8+7] = s3.y;
+    int ind = 0;
+    for(int i = 0; i < 4; i ++) {
+        vec2 v = unpackHalf2x16(packed0[i]);
+        sorted[ind] = v.x;
+        sorted[ind+1] = v.y;
+
+        ind += 2;
     }
+
+    for(int i = 0; i < 4; i ++) {
+        vec2 v = unpackHalf2x16(packed1[i]);
+        sorted[ind] = v.x;
+        sorted[ind+1] = v.y;
+
+        ind += 2;
+    }
+
+    int stride = 3;
+    for(int i = 0; i < 16; i ++) {
+        shs[offset + (i*stride)] = sorted[i];
+    }
+}
+
+
+vec3 eval_sh_rgb(highp usampler2D tex_r, highp usampler2D tex_g, highp usampler2D tex_b, int index, uint deg, vec3 dir) {
+    float shs[48];
+
+    uvec4 packed_r0 = texelFetch(tex_r, ivec2(((uint(index) & 0x3ffu) << 1), uint(index) >> 10), 0);
+    uvec4 packed_r1 = texelFetch(tex_r, ivec2(((uint(index) & 0x3ffu) << 1) | 1u, uint(index) >> 10), 0);
+    fill_sh_from_packed(packed_r0, packed_r1, 0, shs);
+
+    uvec4 packed_g0 = texelFetch(tex_g, ivec2(((uint(index) & 0x3ffu) << 1), uint(index) >> 10), 0);
+    uvec4 packed_g1 = texelFetch(tex_g, ivec2(((uint(index) & 0x3ffu) << 1) | 1u, uint(index) >> 10), 0);
+    fill_sh_from_packed(packed_g0, packed_g1, 1, shs);
+
+    uvec4 packed_b0 = texelFetch(tex_b, ivec2(((uint(index) & 0x3ffu) << 1), uint(index) >> 10), 0);
+    uvec4 packed_b1 = texelFetch(tex_b, ivec2(((uint(index) & 0x3ffu) << 1) | 1u, uint(index) >> 10), 0);
+    fill_sh_from_packed(packed_b0, packed_b1, 2, shs);
     
     vec3 result = SH_C0 * vec3(shs[0], shs[1], shs[2]);
 
@@ -85,38 +103,15 @@ vec3 eval_sh(highp usampler2D tex, int index, uint deg, vec3 dir) {
     return vec3(max(result.x, 0.), max(result.y, 0.), max(result.z, 0.));
 }
 
-vec3 eval_sh_test(highp usampler2D tex, int index, uint deg, vec3 dir) {
-    uvec4 sh0ui = texelFetch(tex, ivec2((index % 256) * 8 , index / 256), 0);
-    uvec4 sh1ui = texelFetch(tex, ivec2(((index % 256) * 8) + 1 , index / 256), 0);
-    // uvec4 sh0ui = texelFetch(tex, ivec2(((uint(index) & 0xffu) << 3), uint(index) >> 8), 0);
-    // uvec4 sh1ui = texelFetch(tex, ivec2(((uint(index) & 0xffu) << 3) + 1u, uint(index) >> 8), 0);
-    uvec4 sh2ui = texelFetch(tex, ivec2(((uint(index) & 0xffu) << 3) | 2u, uint(index) >> 8), 0);
-    uvec4 sh3ui = texelFetch(tex, ivec2(((uint(index) & 0xffu) << 3) | 3u, uint(index) >> 8), 0);
-
-    vec3 sh0 = uintBitsToFloat(sh0ui.xyz);
-    vec3 sh1 = uintBitsToFloat(sh1ui.xyz);
-    vec3 sh2 = uintBitsToFloat(sh2ui.xyz);
-    vec3 sh3 = uintBitsToFloat(sh3ui.xyz);
-
-    //custom value: return sh components of 1st band
-
-    // return sh1;
-    vec3 result = SH_C0 * sh0;
-
-    if(deg > 0u) {
-        result -= (SH_C1 * dir.y * sh1) + 
-                  (SH_C1 * dir.z * sh2) - 
-                  (SH_C1 * dir.x * sh3);
-    }
-
-    result += 0.5;
-    return vec3(max(result.x, 0.), max(result.y, 0.), max(result.z, 0.));
-}
-
 
 
 uniform highp usampler2D u_texture;
-uniform highp usampler2D u_shTexture;
+// uniform highp usampler2D u_shTexture;
+
+uniform highp usampler2D u_sh_r;
+uniform highp usampler2D u_sh_g;
+uniform highp usampler2D u_sh_b;
+
 uniform mat4 projection, view;
 uniform vec2 focal;
 uniform vec2 viewport;
@@ -125,7 +120,7 @@ uniform vec3 camPos;
 uniform bool u_useDepthFade;
 uniform float u_depthFade;
 
-uniform bool u_useShs;
+uniform bool u_use_shs;
 
 in vec2 position;
 in int index;
@@ -171,11 +166,12 @@ void main () {
     float opacity = float((cov.w >> 24) & 0xffu) / 255.0;
 
     //color based on spherical harmonics
-    if(u_useShs) {
+    if(u_use_shs) {
         const uint deg = 3u;    //degree per gaussian can be set (would have to store it in sh texture padding).
         mat4 inverted_view = inverse(view);
         vec3 dir = normalize(p - inverted_view[3].xyz);
-        rgb = eval_sh(u_shTexture, index, deg, dir);
+        // rgb = eval_sh(u_shTexture, index, deg, dir);
+        rgb = eval_sh_rgb(u_sh_r, u_sh_g, u_sh_b, index, deg, dir);
         
     } else {
 

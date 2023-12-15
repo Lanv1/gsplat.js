@@ -16,6 +16,8 @@ class Scene extends EventDispatcher {
     private _shs: Uint32Array;
     private _shHeight: number;
 
+    private _shs_rgb: [Uint32Array, Uint32Array, Uint32Array];
+
     setData: (data: Uint8Array, shs?: Float32Array) => void;
     translate: (translation: Vector3) => void;
     rotate: (rotation: Quaternion) => void;
@@ -76,6 +78,8 @@ class Scene extends EventDispatcher {
         this._rotations = new Float32Array(0);
         this._scales = new Float32Array(0);
         this._shs = new Uint32Array(0);
+        this._shs_rgb = [new Uint32Array(0), new Uint32Array(0), new Uint32Array(0)];
+        
 
         this.setData = (data: Uint8Array, shs?: Float32Array) => {
             this._vertexCount = data.length / Scene.RowLength;
@@ -90,6 +94,13 @@ class Scene extends EventDispatcher {
             if(typeof shs != 'undefined') {
                 //padding added
                 this._shs = new Uint32Array(this._width* this._shHeight * 4);
+
+                // no pad needed: 16F32 -> 8F32 using half16 packing so each sh texture is the same size as data texture !
+                this._shs_rgb = [
+                    new Uint32Array(this._width * this._height * 4),
+                    new Uint32Array(this._width * this._height * 4),
+                    new Uint32Array(this._width * this._height * 4)
+                ];
             }
 
             const f_buffer = new Float32Array(data.buffer);
@@ -99,16 +110,26 @@ class Scene extends EventDispatcher {
             const data_f = new Float32Array(this._data.buffer);
             
             const shs_f = new Float32Array(this._shs.buffer);
-           
+            const stride = 3;
+
             for (let i = 0; i < this._vertexCount; i++) {
                 
                 if(typeof shs != 'undefined') {
                     // pack input F32 shs to H16 inside the scene.
-                    for(let j = 0; j < 48; j +=2) {
-                        this._shs[shs_ind] = packHalf2x16(shs[i*48+j], shs[i*48+(j+1)]);
-                        shs_ind ++;
+                    // for(let j = 0; j < 48; j +=2) {
+                    //     this._shs[shs_ind] = packHalf2x16(shs[i*48+j], shs[i*48+(j+1)]);
+                    //     shs_ind ++;
+                    // }
+                    // shs_ind += 8;
+
+                    // BETTER: pack them in 3 textures (one per component)       
+                    let ind = (i*48);
+                    for(let j = 0; j < 8; j ++) {
+                        this._shs_rgb[0][8*i + j] = packHalf2x16(shs[ind], shs[ind+stride]);
+                        this._shs_rgb[1][8*i + j] = packHalf2x16(shs[ind+1], shs[ind+stride+1]);
+                        this._shs_rgb[2][8*i + j] = packHalf2x16(shs[ind+2], shs[ind+stride+2]);
+                        ind +=6;
                     }
-                    shs_ind += 8;
                 }
 
                 this._positions[3 * i + 0] = f_buffer[8 * i + 0];
@@ -427,6 +448,10 @@ class Scene extends EventDispatcher {
 
     get shs() {
         return this._shs;
+    }
+
+    get shs_rgb() {
+        return this._shs_rgb;
     }
 
     get shHeight() {

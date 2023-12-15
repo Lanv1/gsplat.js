@@ -18,6 +18,7 @@ export class WebGLRenderer {
     dispose: () => void;
 
     setCameraBuffers: () => void;
+    setShTextures: () => void;
 
     constructor(optionalCanvas: HTMLCanvasElement | null = null, optionalShaderPasses: ShaderPass[] | null = null) {
         const canvas: HTMLCanvasElement = optionalCanvas || document.createElement("canvas");
@@ -58,10 +59,12 @@ export class WebGLRenderer {
         let u_view: WebGLUniformLocation;
         let u_texture: WebGLUniformLocation;
         let u_camPos: WebGLUniformLocation;
-        
-        let u_shTexture: WebGLUniformLocation;
 
-        let u_useShs: WebGLUniformLocation;
+        let u_tex_sh_r: WebGLUniformLocation;
+        let u_tex_sh_g: WebGLUniformLocation;
+        let u_tex_sh_b: WebGLUniformLocation;
+        
+        let u_use_shs: WebGLUniformLocation;
         
         let positionAttribute: number;
         let indexAttribute: number;
@@ -114,7 +117,7 @@ export class WebGLRenderer {
                 console.error(gl.getShaderInfoLog(vertexShader));
             }
 
-            gl.getParameter(gl.MAX_VERTEX_ATTRIBS);
+            console.log("max texture size is: " + gl.getParameter(gl.MAX_TEXTURE_SIZE));
 
             fragmentShader = gl.createShader(gl.FRAGMENT_SHADER) as WebGLShader;
             gl.shaderSource(fragmentShader, frag);
@@ -191,37 +194,12 @@ export class WebGLRenderer {
             );
             
             //2nd texture holding shs coefficients (with padding)
-            u_useShs = gl.getUniformLocation(program, "u_useShs") as WebGLUniformLocation;
-            gl.uniform1i(u_useShs, 0);
+            u_use_shs = gl.getUniformLocation(program, "u_use_shs") as WebGLUniformLocation;
+            gl.uniform1i(u_use_shs, 0);
             
             if(activeScene.shs.length) {
-                gl.uniform1i(u_useShs, 1);
-                const shTexture = gl.createTexture();
-                gl.bindTexture(gl.TEXTURE_2D, shTexture);
-                  
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-                gl.texImage2D(
-                    gl.TEXTURE_2D,
-                    0,
-                    gl.RGBA32UI,
-                    activeScene.width,
-                    activeScene.shHeight,
-                    0,
-                    gl.RGBA_INTEGER,
-                    gl.UNSIGNED_INT,
-                    activeScene.shs,
-                );
-    
-                u_shTexture = gl.getUniformLocation(program, "u_shTexture") as WebGLUniformLocation;
-                gl.uniform1i(u_shTexture, 1);
-
-                gl.activeTexture(gl.TEXTURE1);
-                gl.bindTexture(gl.TEXTURE_2D, shTexture);
-
-                console.log(`sh texture size: 2048x${activeScene.shHeight}`);
+                gl.uniform1i(u_use_shs, 1);
+                this.setShTextures();
             }
             
             u_texture = gl.getUniformLocation(program, "u_texture") as WebGLUniformLocation;
@@ -321,6 +299,53 @@ export class WebGLRenderer {
             // gl.uniform2fv(u_focal, new Float32Array([activeCamera.fx, activeCamera.fy]));
             gl.uniformMatrix4fv(u_view, false, activeCamera.viewMatrix.buffer);
         };
+
+        this.setShTextures = () => {
+
+            const lut = ['r', 'g', 'b'];
+            u_tex_sh_r =  gl.getUniformLocation(program, "u_sh_r") as WebGLUniformLocation;
+            u_tex_sh_g =  gl.getUniformLocation(program, "u_sh_g") as WebGLUniformLocation;
+            u_tex_sh_b =  gl.getUniformLocation(program, "u_sh_b") as WebGLUniformLocation;
+            let textures = [];
+
+
+            for(let i = 0; i < 3; i ++) {
+                const tex = gl.createTexture();
+                gl.bindTexture(gl.TEXTURE_2D, tex);
+                  
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+                gl.texImage2D(
+                    gl.TEXTURE_2D,
+                    0,
+                    gl.RGBA32UI,
+                    activeScene.width,
+                    activeScene.height,
+                    0,
+                    gl.RGBA_INTEGER,
+                    gl.UNSIGNED_INT,
+                    activeScene.shs_rgb[i]
+                );
+                
+                const sampler = `u_sh_${lut[i]}`;
+                textures.push(tex);
+
+                const loc = gl.getUniformLocation(program, sampler) as WebGLUniformLocation;
+            }
+
+
+            gl.uniform1i(u_tex_sh_r, 1);
+            gl.uniform1i(u_tex_sh_g, 2);
+            gl.uniform1i(u_tex_sh_b, 3);
+
+            for(let i = 0; i < 3; i ++) {
+                gl.activeTexture(gl.TEXTURE0+(i+1));
+                gl.bindTexture(gl.TEXTURE_2D, textures[i]);
+            }
+
+        }
 
         this.resize();
     }
