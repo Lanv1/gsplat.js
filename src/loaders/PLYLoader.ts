@@ -451,6 +451,11 @@ class PLYLoader {
             offset: number;
         };
 
+        type CodeBook = {
+            name: string,
+            data: Int16Array
+        };
+
         const shRowLength = 4 * ((1*3) + (15*3)); //diffuse + 3 degrees of spherical harmonics in bytes
 
         const ubuf = new Uint8Array(inputBuffer);
@@ -479,7 +484,6 @@ class PLYLoader {
         
         console.log(vertexCounts);
         
-        let rowOffset = 0;
         const offsets: Record<string, number> = {
             double: 8,
             int: 4,
@@ -490,26 +494,75 @@ class PLYLoader {
             uchar: 1,
         };
 
-        //MAKE A FLOAT16 ARRAY OF SIZE 256 FOR EACH CODEBOOKS ONLY ONCE
-
+        // Fill data structures and compute the data offset in bytes (to know exactly where codebooks starts)
+        let dataByteOffset = 0;
+        let propOffset = 0;
+        const properties : Array<PlyProperty[]> = [];
         for(let i = 0; i < 4; i ++) {
             const vertexCount : number  = vertexCounts[i];
             const start : number = lutExtents[i][0];
             const end : number  = lutExtents[i][1]; 
+            
+            let rowOffset = 0;
+            const vertexProperties : PlyProperty[] = [];
 
-            const properties: PlyProperty[] = [];
             for (const prop of headerText
                 .slice(start, end)
                 .split("\n")
                 .filter((k) => k.startsWith("property "))) {
+
                 // eslint-disable-next-line @typescript-eslint/no-unused-vars
                 const [_p, type, name] = prop.split(" ");
-                properties.push({ name, type, offset: rowOffset });
+                vertexProperties.push({ name, type, offset: propOffset });
                 if (!offsets[type]) throw new Error(`Unsupported property type: ${type}`);
                 rowOffset += offsets[type];
+                propOffset += offsets[type];
             }
 
+            properties.push(vertexProperties);
+
+            dataByteOffset += vertexCount*rowOffset;
             console.log(properties);
+        }
+        
+        // fill codebooks
+        //cb contains each codebooks as int16Array(256)
+        const cb : CodeBook[] = [];
+        
+        for (const prop of headerText
+            .slice(start_codebook_index, header_end_index)
+            .split("\n")
+            .filter((k) => k.startsWith("property "))) {
+                        
+            const [_p, type, name] = prop.split(" ");
+            cb.push({name, data: new Int16Array(256)});
+        }
+                    
+        console.log(dataByteOffset + " bytes before codebooks.");
+        const nbCodeBooks = cb.length;
+        const cbDataView = new DataView(inputBuffer, dataByteOffset + start_codebook_index + start_codebook.length, nbCodeBooks * 2 * 256);
+
+        for(let i = 0; i < 256; i ++) {
+           for(let j = 0; j < nbCodeBooks; j ++) {
+                cb[j].data[i] = cbDataView.getInt16((i*nbCodeBooks*2) + (j*2), true);
+            }
+        }
+
+        console.log(cb);
+
+
+        //main loop
+        for(let i = 0; i < 4; i ++) {
+            const vertexCount : number  = vertexCounts[i];
+            const prop : PlyProperty[] = properties[i];
+            
+            for(let v = 0; v < vertexCount; v ++) {
+                
+                prop.forEach((p) => {
+                    // FILL ARRAYS HERE?.
+                });
+            }
+
         }
 
         // const properties: PlyProperty[] = [];
