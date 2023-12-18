@@ -44,7 +44,8 @@ class PLYLoader {
 
         if(useShs) {
             let before = performance.now();
-            const rawData = this._ParseFullPLYBuffer(plyData.buffer, format);
+            // const rawData = this._ParseFullPLYBuffer(plyData.buffer, format);
+            const rawData = this._ParseQPLYBuffer(plyData.buffer, format);
             let after = performance.now();
 
             console.log("PLY file loading took " + (after - before) + " ms.");
@@ -75,7 +76,9 @@ class PLYLoader {
             if(useShs) {
                 
                 let before = performance.now();
-                const rawData = this._ParseFullPLYBuffer(e.target!.result as ArrayBuffer, format);
+                // const rawData = this._ParseFullPLYBuffer(e.target!.result as ArrayBuffer, format);
+                const rawData = this._ParseQPLYBuffer(e.target!.result as ArrayBuffer, format);
+
                 let after = performance.now();
                 const data = new Uint8Array(rawData[0]);
                 const shData = new Float32Array(rawData[1]);
@@ -438,6 +441,202 @@ class PLYLoader {
         }
 
         return [dataBuffer, shsBuffer];
+    }
+
+    // parse quantized ply
+    private static _ParseQPLYBuffer(inputBuffer: ArrayBuffer, format: string): [ArrayBuffer, ArrayBuffer] {
+        type PlyProperty = {
+            name: string;
+            type: string;
+            offset: number;
+        };
+
+        const shRowLength = 4 * ((1*3) + (15*3)); //diffuse + 3 degrees of spherical harmonics in bytes
+
+        const ubuf = new Uint8Array(inputBuffer);
+        const headerText = new TextDecoder().decode(ubuf.slice(0, 1024 * 10));
+        const header_end = "end_header\n";
+        const header_end_index = headerText.indexOf(header_end);
+        const start_codebook = "element codebook_centers 256\n";
+        const start_codebook_index = headerText.indexOf(start_codebook);
+
+        if (header_end_index < 0) throw new Error("Unable to read .ply file header");
+
+        let vertexCounts : Array<number> = [];
+        let pcIndices : Array<number> = [];
+        
+        headerText.match(/element vertex_(\d+) (\d+)/g)?.forEach((el) => {
+            vertexCounts.push(parseInt(el.split(" ")[2]));
+            pcIndices.push(headerText.indexOf(el))
+        });
+
+        let lutExtents : Array<Array<number>> = [
+            [0, pcIndices[1]],
+            [pcIndices[1], pcIndices[2]],
+            [pcIndices[2], pcIndices[3]],
+            [pcIndices[3], start_codebook_index]
+        ];
+        
+        console.log(vertexCounts);
+        
+        let rowOffset = 0;
+        const offsets: Record<string, number> = {
+            double: 8,
+            int: 4,
+            uint: 4,
+            float: 4,
+            short: 2,
+            ushort: 2,
+            uchar: 1,
+        };
+
+        //MAKE A FLOAT16 ARRAY OF SIZE 256 FOR EACH CODEBOOKS ONLY ONCE
+
+        for(let i = 0; i < 4; i ++) {
+            const vertexCount : number  = vertexCounts[i];
+            const start : number = lutExtents[i][0];
+            const end : number  = lutExtents[i][1]; 
+
+            const properties: PlyProperty[] = [];
+            for (const prop of headerText
+                .slice(start, end)
+                .split("\n")
+                .filter((k) => k.startsWith("property "))) {
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                const [_p, type, name] = prop.split(" ");
+                properties.push({ name, type, offset: rowOffset });
+                if (!offsets[type]) throw new Error(`Unsupported property type: ${type}`);
+                rowOffset += offsets[type];
+            }
+
+            console.log(properties);
+        }
+
+        // const properties: PlyProperty[] = [];
+        // for (const prop of headerText
+        //     .slice(0, header_end_index)
+        //     .split("\n")
+        //     .filter((k) => k.startsWith("property "))) {
+        //     // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        //     const [_p, type, name] = prop.split(" ");
+        //     properties.push({ name, type, offset: rowOffset });
+        //     if (!offsets[type]) throw new Error(`Unsupported property type: ${type}`);
+        //     rowOffset += offsets[type];
+        // }
+
+
+        // const dataView = new DataView(inputBuffer, header_end_index + header_end.length);
+        // const dataBuffer = new ArrayBuffer(Scene.RowLength * vertexCount);
+        // const shsBuffer = new ArrayBuffer(shRowLength * vertexCount);
+
+        // for (let i = 0; i < vertexCount; i++) {
+        //     const position = new Float32Array(dataBuffer, i * Scene.RowLength, 3);
+        //     const scale = new Float32Array(dataBuffer, i * Scene.RowLength + 12, 3);
+        //     const rgba = new Uint8ClampedArray(dataBuffer, i * Scene.RowLength + 24, 4);
+        //     const rot = new Uint8ClampedArray(dataBuffer, i * Scene.RowLength + 28, 4);
+        //     const sh = new Float32Array(shsBuffer, i*shRowLength, 48);
+
+        //     let r0: number = 255;
+        //     let r1: number = 0;
+        //     let r2: number = 0;
+        //     let r3: number = 0; 
+
+        //     properties.forEach((property) => {
+        //         let value;
+        //         switch (property.type) {
+        //             case "float":
+        //                 value = dataView.getFloat32(property.offset + i * rowOffset, true);
+        //                 break;
+        //             case "int":
+        //                 value = dataView.getInt32(property.offset + i * rowOffset, true);
+        //                 break;
+        //             default:
+        //                 throw new Error(`Unsupported property type: ${property.type}`);
+        //         }
+
+        //         if(property.name.startsWith("f_rest")) {
+        //             //spherical harmonics coefficients
+        //             let n = parseInt(property.name.split("_").slice(-1)[0])
+        //             const index = 3 + ((n % 15)*3 + (n / 15));
+        //             sh[index] = value;
+
+        //         } else {
+
+        //             switch (property.name) {
+        //                 case "x":
+        //                     position[0] = value;
+        //                     break;
+        //                 case "y":
+        //                     position[1] = value;
+        //                     break;
+        //                 case "z":
+        //                     position[2] = value;
+        //                     break;
+        //                 case "scale_0":
+        //                     scale[0] = Math.exp(value);
+        //                     break;
+        //                 case "scale_1":
+        //                     scale[1] = Math.exp(value);
+        //                     break;
+        //                 case "scale_2":
+        //                     scale[2] = Math.exp(value);
+        //                     break;
+        //                 case "red":
+        //                     rgba[0] = value;
+        //                     break;
+        //                 case "green":
+        //                     rgba[1] = value;
+        //                     break;
+        //                 case "blue":
+        //                     rgba[2] = value;
+        //                     break;
+        //                 case "f_dc_0":
+        //                     rgba[0] = (0.5 + this.SH_C0 * value) * 255;
+        //                     sh[0] = value;
+        //                     break;
+        //                     case "f_dc_1":
+        //                     rgba[1] = (0.5 + this.SH_C0 * value) * 255;
+        //                     sh[1] = value;
+        //                     break;
+        //                     case "f_dc_2":
+        //                     rgba[2] = (0.5 + this.SH_C0 * value) * 255;
+        //                     sh[2] = value;
+        //                     break;
+        //                 case "f_dc_3":
+        //                     rgba[3] = (0.5 + this.SH_C0 * value) * 255;
+        //                     break;
+        //                 case "opacity":
+        //                     rgba[3] = (1 / (1 + Math.exp(-value))) * 255;
+        //                     break;
+        //                 case "rot_0":
+        //                     r0 = value;
+        //                     break;
+        //                 case "rot_1":
+        //                     r1 = value;
+        //                     break;
+        //                 case "rot_2":
+        //                     r2 = value;
+        //                     break;
+        //                 case "rot_3":
+        //                     r3 = value;
+        //                     break;
+        //             }
+        //         }
+
+        //     });
+
+        //     let q = new Quaternion(r1, r2, r3, r0);
+
+        //     q = q.normalize();
+        //     rot[0] = q.w * 128 + 128;
+        //     rot[1] = q.x * 128 + 128;
+        //     rot[2] = q.y * 128 + 128;
+        //     rot[3] = q.z * 128 + 128;
+        // }
+
+        // return [dataBuffer, shsBuffer];
+
+        return [new ArrayBuffer(0), new ArrayBuffer(0)];
     }
 }
 

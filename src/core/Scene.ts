@@ -16,6 +16,7 @@ class Scene extends EventDispatcher {
     private _shs: Uint32Array;
     private _shHeight: number;
 
+
     private _shs_rgb: [Uint32Array, Uint32Array, Uint32Array];
 
     setData: (data: Uint8Array, shs?: Float32Array) => void;
