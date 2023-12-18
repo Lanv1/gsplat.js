@@ -172,6 +172,7 @@ void main () {
         vec3 dir = normalize(p - inverted_view[3].xyz);
         // rgb = eval_sh(u_shTexture, index, deg, dir);
         rgb = eval_sh_rgb(u_sh_r, u_sh_g, u_sh_b, index, deg, dir);
+        rgb = vec3(min(rgb.x, 1.), min(rgb.y, 1.), min(rgb.z, 1.));
         
     } else {
 

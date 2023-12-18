@@ -109,7 +109,10 @@ async function main() {
     screenshotBtnElem?.addEventListener("click", (ev: Event) => { 
         renderer.render(scene, camera);
         renderer.domElement.toBlob((blob : any) =>  window.open(URL.createObjectURL(blob), '_blank'));
-        
+
+        // const dataURL = renderer.domElement.toDataURL("image/png");
+        // let newTab = window.open('about:blank','image from canvas');
+        // newTab?.document.write("<img src='" + dataURL + "' alt='from canvas'/>");        
     });
 
     // Render loop

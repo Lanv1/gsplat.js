@@ -29,12 +29,13 @@ export class WebGLRenderer {
             canvas.style.height = "100%";
             canvas.style.margin = "0";
             canvas.style.padding = "0";
+            canvas.style.opacity = "1";
             document.body.appendChild(canvas);
         }
         canvas.style.background = "#000";
         this.domElement = canvas;
 
-        const gl = canvas.getContext("webgl2", { antialias: false}) as WebGL2RenderingContext;
+        const gl = canvas.getContext("webgl2", { antialias: false, premultipliedAlpha: false }) as WebGL2RenderingContext;
         this.gl = gl;
 
         const shaderPasses = optionalShaderPasses || [];
@@ -267,13 +268,13 @@ export class WebGLRenderer {
                 gl.uniformMatrix4fv(u_view, false, activeCamera.viewMatrix.buffer);
 
                 // gl.colorMask(false, false, false, true);
-                // gl.clearColor(0, 0, 0, 1);
-                gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+                gl.clearColor(0, 0, 0, 0);
+                gl.clear(gl.COLOR_BUFFER_BIT);
                 gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 4, activeScene.vertexCount);
             } else {
                 // gl.colorMask(false, false, false, true);
-                // gl.clearColor(0, 0, 0, 1);
-                gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+                gl.clearColor(0, 0, 0, 0);
+                gl.clear(gl.COLOR_BUFFER_BIT);
             }
         };
 
