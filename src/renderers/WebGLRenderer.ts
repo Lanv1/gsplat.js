@@ -191,7 +191,7 @@ export class WebGLRenderer {
                 0,
                 gl.RGBA_INTEGER,
                 gl.UNSIGNED_INT,
-                activeScene.data,
+                activeScene.qdata,
             );
             
             //2nd texture holding shs coefficients (with padding)

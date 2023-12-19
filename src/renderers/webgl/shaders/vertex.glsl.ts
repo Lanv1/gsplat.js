@@ -129,8 +129,11 @@ out vec4 vColor;
 out vec2 vPosition;
 
 void main () {
-    uvec4 cen = texelFetch(u_texture, ivec2((uint(index) & 0x3ffu) << 1, uint(index) >> 10), 0);
-    vec3 p = uintBitsToFloat(cen.xyz);
+    uvec4 v1 = texelFetch(u_texture, ivec2((uint(index) & 0x3ffu) << 1, uint(index) >> 10), 0);
+    uvec4 v2 = texelFetch(u_texture, ivec2((uint(index) & 0x3ffu) << 1 | 1u, uint(index) >> 10), 0);
+
+    vec3 p = vec3(unpackHalf2x16(v1.x), unpackHalf2x16(v1.y).x);
+    // vec3 p = uintBitsToFloat(v1.xyz);
     vec4 cam = view * vec4(p, 1);
     vec4 pos2d = projection * cam;
 
@@ -162,24 +165,24 @@ void main () {
     vec2 majorAxis = min(sqrt(2.0 * lambda1), 1024.0) * diagonalVector;
     vec2 minorAxis = min(sqrt(2.0 * lambda2), 1024.0) * vec2(diagonalVector.y, -diagonalVector.x);
 
-    vec3 rgb;
-    float opacity = float((cov.w >> 24) & 0xffu) / 255.0;
+    vec4 rgba = vec4(unpackHalf2x16(v1.z), unpackHalf2x16(v1.w));
+
+    // vec3 rgb;
+    // float opacity = float((cov.w >> 24) & 0xffu) / 255.0;
 
     //color based on spherical harmonics
-    if(u_use_shs) {
-        const uint deg = 3u;    //degree per gaussian can be set (would have to store it in sh texture padding).
-        mat4 inverted_view = inverse(view);
-        vec3 dir = normalize(p - inverted_view[3].xyz);
-        // rgb = eval_sh(u_shTexture, index, deg, dir);
-        rgb = eval_sh_rgb(u_sh_r, u_sh_g, u_sh_b, index, deg, dir);
-        rgb = vec3(min(rgb.x, 1.), min(rgb.y, 1.), min(rgb.z, 1.));
+    // if(u_use_shs) {
+    //     const uint deg = 3u;    //degree per gaussian can be set (would have to store it in sh texture padding).
+    //     mat4 inverted_view = inverse(view);
+    //     vec3 dir = normalize(p - inverted_view[3].xyz);
+    //     // rgb = eval_sh(u_shTexture, index, deg, dir);
+    //     rgb = eval_sh_rgb(u_sh_r, u_sh_g, u_sh_b, index, deg, dir);
+    //     rgb = vec3(min(rgb.x, 1.), min(rgb.y, 1.), min(rgb.z, 1.));
         
-    } else {
+    // } 
 
-        rgb = vec3((cov.w) & 0xffu, (cov.w >> 8) & 0xffu, (cov.w >> 16) & 0xffu) / 255.0;
-    }
-
-    vColor = vec4(rgb, opacity);
+    vColor = rgba;
+    // vColor = vec4(rgb, opacity);
 
     vPosition = position;
 
