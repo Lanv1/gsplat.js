@@ -25,8 +25,8 @@ export class WebGLRenderer {
         if (!optionalCanvas) {
             canvas.style.display = "block";
             canvas.style.boxSizing = "border-box";
-            canvas.style.width = "100%";
-            canvas.style.height = "100%";
+            canvas.style.width = "100vw";
+            canvas.style.height = "100vh";
             canvas.style.margin = "0";
             canvas.style.padding = "0";
             canvas.style.opacity = "1";
