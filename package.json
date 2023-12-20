@@ -6,7 +6,7 @@
   "types": "dist/index.d.ts",
   "type": "module",
   "scripts": {
-    "build:wasm": "./compile_wasm.sh",
+    "build:wasm": "bash compile_wasm.sh",
     "copy:wasm": "ncp ./src/wasm ./dist/wasm",
     "build": "npm run build:wasm && rollup -c && npm run copy:wasm",
     "prepare": "npm run build",
