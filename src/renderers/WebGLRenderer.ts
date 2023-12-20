@@ -199,10 +199,11 @@ export class WebGLRenderer {
             // u_use_shs = gl.getUniformLocation(program, "u_use_shs") as WebGLUniformLocation;
             // gl.uniform1i(u_use_shs, 0);
 
-            u_band0count = gl.getUniformLocation(program, "u_use_shs") as WebGLUniformLocation;
+            u_band0count = gl.getUniformLocation(program, "u_band0count") as WebGLUniformLocation;
             gl.uniform1i(u_band0count, activeScene.g0bands);
             
-            this.setShTextures();
+            if(activeScene.shHeight)
+                this.setShTextures();
             // if(activeScene.shs.length) {
             //     gl.uniform1i(u_use_shs, 1);
             //     this.setShTextures();

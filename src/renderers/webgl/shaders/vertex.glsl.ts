@@ -175,7 +175,7 @@ void main () {
         const uint deg = 3u;    //degree per gaussian can be set (would have to store it in sh texture padding).
         mat4 inverted_view = inverse(view);
         vec3 dir = normalize(p - inverted_view[3].xyz);
-        // rgb = eval_sh(u_shTexture, index, deg, dir);
+
         rgb = eval_sh_rgb(u_sh_r, u_sh_g, u_sh_b, tex_index, deg, dir);
         rgb = vec3(min(rgb.x, 1.), min(rgb.y, 1.), min(rgb.z, 1.));
         

@@ -92,6 +92,7 @@ class PLYLoader {
                 scene.g0bands = vertexCount; //Nb of vertices having 0 bands.
                 before = performance.now();            
                 // scene.setDataQ(data, vertexCount);
+                // scene.setData(data);
                 scene.setData(data, shData);
                 after = performance.now();
 
@@ -544,13 +545,6 @@ class PLYLoader {
         console.log("PROPERTIES ")
         console.log(properties);
 
-        // globalRowOffsets = [
-        //     0,
-        //     globalRowOffsets[0],
-        //     globalRowOffsets[1],
-        //     globalRowOffsets[2]
-        // ];
-        
         // fill codebooks
         //cb contains each codebooks as int16Array(256)
         let cbIndex : any = {};
@@ -590,7 +584,7 @@ class PLYLoader {
 
         let dataByteSizeWrite = 0;
         const nbPropData = properties[0].length;
-        console.log("for data: byte row length: " + (nbPropData*2));
+        // console.log("for data: byte row length: " + (nbPropData*2));
         for(let i = 0; i < 4; i ++) {
             dataByteSizeWrite += vertexCounts[i]*nbPropData*2;
         }
@@ -599,6 +593,7 @@ class PLYLoader {
         const valDataView = new DataView(inputBuffer, header_end_index + header_end.length, dataByteSizeRead);
         const dataBuffer = new ArrayBuffer(Scene.RowLength * totalVertexCount);
         const shsBuffer = new ArrayBuffer(shRowLength * vertexCounts[3]);
+
         let shLength = 0;
         //main loop
         let writeOffset = 0;
@@ -612,7 +607,7 @@ class PLYLoader {
             console.log("row offset in read buffer in bytes: " + rowOffsetRead);
             
             if(i === 3) shLength = shRowLength;
-
+            
             for(let v = 0; v < vertexCount; v ++) {
                 const position = new Float32Array(dataBuffer, writeOffset + v * Scene.RowLength, 3);
                 const scale = new Float32Array(dataBuffer, writeOffset + v * Scene.RowLength + 12, 3);
@@ -633,6 +628,7 @@ class PLYLoader {
                     // console.log(``);
 
                     let value;
+                    let coeff;
                     if(property.type === "short") {
                         //position xyz
                         value = valDataView.getInt16(readOffset + property.offset + v * rowOffsetRead, true);
@@ -641,23 +637,12 @@ class PLYLoader {
                         switch (property.name) {
 
                             case "x":
-                                // position[0] = value & 0xff; // lsb
-                                // position[1] = value >> 8;   // msb
-                                // position[0] = int16ToFloat32(new Int16Array([value]), 0, 1)[0];
                                 position[0] = decodeFloat16(new Int16Array([value]), 0, 1)[0];
                                 break;
                             case "y":
-                                // position[2] = value & 0xff;
-                                // position[3] = value >> 8;
-                                
-                                // position[1] = int16ToFloat32(new Int16Array([value]), 0, 1)[0];
                                 position[1] = decodeFloat16(new Int16Array([value]), 0, 1)[0];
                                 break;
                             case "z":
-                                // position[4] = value & 0xff;
-                                // position[5] = value >> 8;
-
-                                // position[2] = int16ToFloat32(new Int16Array([value]), 0, 1)[0];
                                 position[2] = decodeFloat16(new Int16Array([value]), 0, 1)[0];
                                 break;
                         }
@@ -677,19 +662,25 @@ class PLYLoader {
                             const n14 = Math.floor(n44 / 3);
                             indexOfCb = cbIndex[`features_rest_${n14}`];
 
-                            // console.log(`f_rest${n44} maps to features_rest_${n14}`);
+                            // console.log(`f_rest${3+n44} maps to features_rest_${n14}`);
                             // console.log(`Index of cb features_rest_${n14} : ${indexOfCb}`);
 
                             value = cb[indexOfCb].data[index];
-                            console.log(`${3+n44}: [${index}]`);
-
+                            
                             //spherical harmonics coefficients
-                            const shIndex = 3 + (15*(n44 % 3) + Math.floor(n44/3));
-                            sh[shIndex] = decodeFloat16(new Int16Array([value]), 0, 3)[0];
+                            // const shIndex = 3 + (15*(n14 % 3) + Math.floor(n14/3));
+                            // const shIndex = n14 + (n44%3)*15;
+                            const shIndex = Math.floor(n44/15) + 3*(n44 % 15);
+                            console.log(`${3+shIndex}: [${index}]`);
+
+                            coeff = decodeFloat16(new Int16Array([value]), 0, 3)[0];
+                            // console.log(``)
+                            sh[3+shIndex] = coeff
                             // sh[3+n + 1] = shsRgb[1];
                             // sh[3+n + 2] = shsRgb[2];
         
-                        } else {
+                        } else {    
+                            
 
                             switch (property.name) {
                                 case "scale_0":
@@ -698,79 +689,90 @@ class PLYLoader {
     
                                     // scale[0] = value & 0xff;
                                     // scale[1] = value >> 8;
-    
-                                    scale[0] = Math.exp(decodeFloat16(new Int16Array([value]), 0, 1)[0]);
+                                    coeff = decodeFloat16(new Int16Array([value]), 0, 1)[0];
+                                    scale[0] = Math.exp(coeff);
                                     break;
                                 case "scale_1":
                                     indexOfCb = cbIndex["scaling"];
                                     value = cb[indexOfCb].data[index];
     
                                     // scale[2] = value & 0xff;
-                                    // scale[3] = value >> 8;
-                                    scale[1] = Math.exp(decodeFloat16(new Int16Array([value]), 0, 1)[0]);
+                                    coeff = decodeFloat16(new Int16Array([value]), 0, 1)[0];
+                                    scale[1] = Math.exp(coeff);
                                     break;
                                 case "scale_2":
                                     indexOfCb = cbIndex["scaling"];
                                     value = cb[indexOfCb].data[index];
                                     
                                     // scale[4] = value & 0xff;
-                                    // scale[5] = value >> 8;
-                                    scale[2] = Math.exp(decodeFloat16(new Int16Array([value]), 0, 1)[0]);
+                                    coeff = decodeFloat16(new Int16Array([value]), 0, 1)[0];
+                                    scale[2] = Math.exp(coeff);
                                     break;
                                 case "f_dc_0":
                                     indexOfCb = cbIndex["features_dc"];
                                     value = cb[indexOfCb].data[index];
-                                    
-                                    rgba[0] = decodeFloat16(new Int16Array([value]), 0, 1)[0];
-                                    rgba[0] = (0.5 + this.SH_C0 * rgba[0]) * 255;
-                                    sh[0] = decodeFloat16(new Int16Array([value]), 0, 1)[0];
+                                    // console.log(`f_dc_0: ${index}`);
+                                    coeff = decodeFloat16(new Int16Array([value]), 0, 1)[0];
+
+                                    // rgba[0] = (0.5 + this.SH_C0 * rgba[0]) * 255;
+                                    rgba[0] = (0.5 + coeff) * 255;
+                                    sh[0] = coeff;
                                     break;
                                 case "f_dc_1":
                                     indexOfCb = cbIndex["features_dc"];
                                     value = cb[indexOfCb].data[index];
-    
-                                    rgba[1] = decodeFloat16(new Int16Array([value]), 0, 1)[0];
-                                    rgba[1] = (0.5 + this.SH_C0 * rgba[1]) * 255;
-                                    sh[1] = decodeFloat16(new Int16Array([value]), 0, 1)[0];
+                                    // console.log(`f_dc_1: ${index}`);
+                                    coeff = decodeFloat16(new Int16Array([value]), 0, 1)[0];
+
+                                    // rgba[0] = (0.5 + this.SH_C0 * rgba[0]) * 255;
+                                    rgba[1] = (0.5 + coeff) * 255;
+                                    sh[1] = coeff;
                                     break;
                                 case "f_dc_2":
                                     indexOfCb = cbIndex["features_dc"];
                                     value = cb[indexOfCb].data[index];
-    
-                                    rgba[2] = decodeFloat16(new Int16Array([value]), 0, 1)[0];
-                                    rgba[2] = (0.5 + this.SH_C0 * rgba[2]) * 255;
-                                    sh[2] = decodeFloat16(new Int16Array([value]), 0, 1)[0];
+                                    // console.log(`f_dc_2: ${index}`);
+
+                                    coeff = decodeFloat16(new Int16Array([value]), 0, 1)[0];
+
+                                    // rgba[0] = (0.5 + this.SH_C0 * rgba[0]) * 255;
+                                    rgba[2] = (0.5 + coeff) * 255;
+                                    sh[2] = coeff;
                                     break;
                                 case "opacity":
                                     indexOfCb = cbIndex["opacity"];
                                     value = cb[indexOfCb].data[index];
-    
-                                    rgba[3] = decodeFloat16(new Int16Array([value]), 0, 1)[0];
-                                    rgba[3] = (1 / (1 + Math.exp(-rgba[3]))) * 255;
+                                    coeff = decodeFloat16(new Int16Array([value]), 0, 1)[0];
+
+                                    rgba[3] = (1 / (1 + Math.exp(-coeff))) * 255;
                                     break;
                                 case "rot_0":
                                     indexOfCb = cbIndex["rotation_re"];
                                     value = cb[indexOfCb].data[index];
-    
-                                    r0 = decodeFloat16(new Int16Array([value]), 0, 1)[0];
+                                    coeff = decodeFloat16(new Int16Array([value]), 0, 1)[0];
+
+                                    r0 = coeff;
                                     break;
                                 case "rot_1":
                                     indexOfCb = cbIndex["rotation_im"];
                                     value = cb[indexOfCb].data[index];
-    
-                                    r1 = decodeFloat16(new Int16Array([value]), 0, 1)[0];
+                                    coeff = decodeFloat16(new Int16Array([value]), 0, 1)[0];
+
+                                    r1 = coeff;
                                     break;
                                 case "rot_2":
                                     indexOfCb = cbIndex["rotation_im"];
                                     value = cb[indexOfCb].data[index];
-    
-                                    r2 = decodeFloat16(new Int16Array([value]), 0, 1)[0];
+                                    coeff = decodeFloat16(new Int16Array([value]), 0, 1)[0];
+
+                                    r2 = coeff;
                                     break;
                                 case "rot_3":
                                     indexOfCb = cbIndex["rotation_im"];
                                     value = cb[indexOfCb].data[index];  
-    
-                                    r3 = decodeFloat16(new Int16Array([value]), 0, 1)[0];
+                                    coeff = decodeFloat16(new Int16Array([value]), 0, 1)[0];
+
+                                    r3 = coeff;
                                     break;
                             }
                         }
@@ -802,9 +804,9 @@ class PLYLoader {
 
         console.log("total vertex count (all 4 sub point clouds): " + totalVertexCount);
 
-        const fView = new Float32Array(shsBuffer);
-        console.log("SHS RECOVERED ? ");
-        console.log(fView);
+        // const fView = new Float32Array(shsBuffer);
+        // console.log("SHS RECOVERED ? ");
+        // console.log(fView);
         return [dataBuffer, shsBuffer, vertexCounts[0]];
     }
 }
