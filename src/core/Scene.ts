@@ -2,6 +2,8 @@ import { Matrix3 } from "../math/Matrix3";
 import { Quaternion } from "../math/Quaternion";
 import { Vector3 } from "../math/Vector3";
 import { EventDispatcher } from "./EventDispatcher";
+import { packHalf2x16 } from "../utils";
+import { int16ToFloat32 } from "../utils";
 
 class Scene extends EventDispatcher {
     static RowLength = 3 * 4 + 3 * 4 + 4 + 4;
@@ -17,6 +19,7 @@ class Scene extends EventDispatcher {
     private _shHeight: number;
 
     private _qdata: Uint32Array;
+    private _g0bands: number;
 
 
     private _shs_rgb: [Uint32Array, Uint32Array, Uint32Array];
@@ -34,57 +37,8 @@ class Scene extends EventDispatcher {
     constructor() {
         super();
 
-        const _floatView: Float32Array = new Float32Array(1);
-        const _int32View: Int32Array = new Int32Array(_floatView.buffer);
-
-        const floatToHalf = (float: number) => {
-            _floatView[0] = float;
-            const f = _int32View[0];
-
-            const sign = (f >> 31) & 0x0001;
-            const exp = (f >> 23) & 0x00ff;
-            let frac = f & 0x007fffff;
-
-            let newExp;
-            if (exp == 0) {
-                newExp = 0;
-            } else if (exp < 113) {
-                newExp = 0;
-                frac |= 0x00800000;
-                frac = frac >> (113 - exp);
-                if (frac & 0x01000000) {
-                    newExp = 1;
-                    frac = 0;
-                }
-            } else if (exp < 142) {
-                newExp = exp - 112;
-            } else {
-                newExp = 31;
-                frac = 0;
-            }
-
-            return (sign << 15) | (newExp << 10) | (frac >> 13);
-        };
-
-        // x is on the 16 lsb, y on the 16 msb
-        const packHalf2x16 = (x: number, y: number) => {
-            return (floatToHalf(x) | (floatToHalf(y) << 16)) >>> 0;
-        };
-
         const packHalfs = (x: number, y: number) => {
             return (x | (y << 16)) >>> 0;
-        };
-
-        // https://stackoverflow.com/questions/35234551/javascript-converting-from-int16-to-float32
-        const int16ToFloat32 = (inputArray: Int16Array, startIndex: number, length: number) => {
-            let output = new Float32Array(inputArray.length-startIndex);
-            for (let i = startIndex; i < length; i++) {
-                var int = inputArray[i];
-                // If the high bit is on, then it is a negative number, and actually counts backwards.
-                var float = (int >= 0x8000) ? -(0x10000 - int) / 0x8000 : int / 0x7FFF;
-                output[i] = float;
-            }
-            return output;
         };
 
         const changeEvent = { type: "change" } as Event;
@@ -100,11 +54,15 @@ class Scene extends EventDispatcher {
         this._shs = new Uint32Array(0);
         this._shs_rgb = [new Uint32Array(0), new Uint32Array(0), new Uint32Array(0)];
         this._qdata = new Uint32Array(0);
+        this._g0bands = 0;
 
         this.setData = (data: Uint8Array, shs?: Float32Array) => {
             this._vertexCount = data.length / Scene.RowLength;
+            
+            const g3bands = this.vertexCount - this.g0bands;
+
             this._height = Math.ceil((2 * this._vertexCount) / this._width);
-            this._shHeight = Math.ceil((8 * this._vertexCount) / this._width);
+            this._shHeight = Math.ceil((2 * g3bands) / this._width);
             this._data = new Uint32Array(this._width * this._height * 4);
             this._positions = new Float32Array(3 * this._vertexCount);
             this._rotations = new Float32Array(4 * this._vertexCount);
@@ -117,9 +75,9 @@ class Scene extends EventDispatcher {
 
                 // no pad needed: 16F32 -> 8F32 using half16 packing so each sh texture is the same size as data texture !
                 this._shs_rgb = [
-                    new Uint32Array(this._width * this._height * 4),
-                    new Uint32Array(this._width * this._height * 4),
-                    new Uint32Array(this._width * this._height * 4)
+                    new Uint32Array(this._width * this._shHeight * 4),
+                    new Uint32Array(this._width * this._shHeight * 4),
+                    new Uint32Array(this._width * this._shHeight * 4)
                 ];
             }
 
@@ -132,8 +90,7 @@ class Scene extends EventDispatcher {
             const shs_f = new Float32Array(this._shs.buffer);
             const stride = 3;
 
-            for (let i = 0; i < this._vertexCount; i++) {
-                
+            for(let i = 0; i < g3bands; i ++) {
                 if(typeof shs != 'undefined') {
                     // pack input F32 shs to H16 inside the scene.
                     // for(let j = 0; j < 48; j +=2) {
@@ -151,6 +108,11 @@ class Scene extends EventDispatcher {
                         ind +=6;
                     }
                 }
+
+            }
+
+            for (let i = 0; i < this._vertexCount; i++) {
+                
 
                 this._positions[3 * i + 0] = f_buffer[8 * i + 0];
                 this._positions[3 * i + 1] = f_buffer[8 * i + 1];
@@ -610,6 +572,14 @@ class Scene extends EventDispatcher {
 
     get qdata() {
         return this._qdata
+    }
+
+    get g0bands() {
+        return this._g0bands;
+    }
+
+    set g0bands(nbGaussian0bands: number) {
+        this._g0bands = nbGaussian0bands;
     }
 }
 

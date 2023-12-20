@@ -60,6 +60,7 @@ export class WebGLRenderer {
         let u_view: WebGLUniformLocation;
         let u_texture: WebGLUniformLocation;
         let u_camPos: WebGLUniformLocation;
+        let u_band0count: WebGLUniformLocation;
 
         let u_tex_sh_r: WebGLUniformLocation;
         let u_tex_sh_g: WebGLUniformLocation;
@@ -191,17 +192,21 @@ export class WebGLRenderer {
                 0,
                 gl.RGBA_INTEGER,
                 gl.UNSIGNED_INT,
-                activeScene.qdata,
+                activeScene.data,
             );
             
             //2nd texture holding shs coefficients (with padding)
-            u_use_shs = gl.getUniformLocation(program, "u_use_shs") as WebGLUniformLocation;
-            gl.uniform1i(u_use_shs, 0);
+            // u_use_shs = gl.getUniformLocation(program, "u_use_shs") as WebGLUniformLocation;
+            // gl.uniform1i(u_use_shs, 0);
+
+            u_band0count = gl.getUniformLocation(program, "u_use_shs") as WebGLUniformLocation;
+            gl.uniform1i(u_band0count, activeScene.g0bands);
             
-            if(activeScene.shs.length) {
-                gl.uniform1i(u_use_shs, 1);
-                this.setShTextures();
-            }
+            this.setShTextures();
+            // if(activeScene.shs.length) {
+            //     gl.uniform1i(u_use_shs, 1);
+            //     this.setShTextures();
+            // }
             
             u_texture = gl.getUniformLocation(program, "u_texture") as WebGLUniformLocation;
             gl.uniform1i(u_texture, 0);
@@ -323,7 +328,7 @@ export class WebGLRenderer {
                     0,
                     gl.RGBA32UI,
                     activeScene.width,
-                    activeScene.height,
+                    activeScene.shHeight,
                     0,
                     gl.RGBA_INTEGER,
                     gl.UNSIGNED_INT,
