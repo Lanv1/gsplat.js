@@ -198,12 +198,16 @@ export class WebGLRenderer {
             //2nd texture holding shs coefficients (with padding)
             // u_use_shs = gl.getUniformLocation(program, "u_use_shs") as WebGLUniformLocation;
             // gl.uniform1i(u_use_shs, 0);
+            
+            console.log(`u_band0count should be ${activeScene.g0bands}`);
 
             u_band0count = gl.getUniformLocation(program, "u_band0count") as WebGLUniformLocation;
             gl.uniform1i(u_band0count, activeScene.g0bands);
             
-            if(activeScene.shHeight)
+            if(activeScene.shHeight) {
+                console.log("sh textures is filled: height " + activeScene.shHeight);
                 this.setShTextures();
+            }
             // if(activeScene.shs.length) {
             //     gl.uniform1i(u_use_shs, 1);
             //     this.setShTextures();

@@ -6,6 +6,7 @@ import { decodeFloat16 } from "../utils";
 
 class PLYLoader {
     static SH_C0 = 0.28209479177387814;
+    static timestamp = 0;
 
     static async LoadAsync(
         url: string,
@@ -13,6 +14,7 @@ class PLYLoader {
         onProgress?: (progress: number) => void,
         format: string = "",
         useShs: boolean = false,
+        quantized: boolean = false
     ): Promise<void> {
         const req = await fetch(url, {
             mode: "cors",
@@ -28,6 +30,7 @@ class PLYLoader {
         const plyData = new Uint8Array(contentLength);
 
         let bytesRead = 0;
+        this.timestamp = performance.now();
 
         // eslint-disable-next-line no-constant-condition
         while (true) {
@@ -39,6 +42,8 @@ class PLYLoader {
 
             onProgress?.(bytesRead / contentLength);
         }
+        const loadTime = performance.now() - this.timestamp;
+        console.log(`File loaded in ${loadTime}ms.`);
 
         if (plyData[0] !== 112 || plyData[1] !== 108 || plyData[2] !== 121 || plyData[3] !== 10) {
             throw new Error("Invalid PLY file");
@@ -50,7 +55,7 @@ class PLYLoader {
             const rawData = this._ParseQPLYBuffer(plyData.buffer, format);
             let after = performance.now();
 
-            console.log("PLY file loading took " + (after - before) + " ms.");
+            console.log("PLY file parsing loading took " + (after - before) + " ms.");
             
             const data = new Uint8Array(rawData[0]);
             const shData = new Float32Array(rawData[1]);
@@ -71,25 +76,34 @@ class PLYLoader {
         scene: Scene,
         onProgress?: (progress: number) => void,
         format: string = "",
-        useShs: boolean = false
+        useShs: boolean = false,
+        quantized: boolean = false
     ): Promise<void> {
         const reader = new FileReader();
         reader.onload = (e) => {
             if(useShs) {
-                
+                const loadTime = performance.now() - this.timestamp;
+                console.log(`File loaded in ${loadTime}ms.`);
                 let before = performance.now();
+
+                let rawData;
                 // const rawData = this._ParseFullPLYBuffer(e.target!.result as ArrayBuffer, format);
-                const rawData = this._ParseQPLYBuffer(e.target!.result as ArrayBuffer, format);
+                if(quantized) {
+                    rawData = this._ParseQPLYBuffer(e.target!.result as ArrayBuffer, format);    
+                    scene.g0bands= rawData[2];//Nb of vertices having 0 bands.
+                } else {
+                    rawData = this._ParseFullPLYBuffer(e.target!.result as ArrayBuffer, format);
+                }
 
                 let after = performance.now();
                 const data = new Uint8Array(rawData[0]);
                 const vertexCount = rawData[2];
                 const shData = new Float32Array(rawData[1]);
 
-                console.log("PLY file loading took " + (after - before) + " ms.");
+                console.log("PLY file parsing loading took " + (after - before) + " ms.");
                 // console.log(data);
 
-                scene.g0bands = vertexCount; //Nb of vertices having 0 bands.
+                //  = vertexCount; //Nb of vertices having 0 bands.
                 before = performance.now();            
                 // scene.setDataQ(data, vertexCount);
                 // scene.setData(data);
@@ -107,6 +121,11 @@ class PLYLoader {
                 scene.setData(data);
             }
         };
+
+        reader.onloadstart = (e) => {
+            this.timestamp = performance.now();
+        }
+
         reader.onprogress = (e) => {
             onProgress?.(e.loaded / e.total);
         };
@@ -501,12 +520,8 @@ class PLYLoader {
 
         // Fill data structures and compute the data offset in bytes (to know exactly where codebooks starts)
         let dataByteSizeRead = 0;
-        let propOffset = 0;
         const properties : Array<PlyProperty[]> = [];
         let rowOffsetsRead = [];
-        let rowOffsetsWrite = [];
-        let globalRowOffsets = [];
-        let totalPropCount = 0;
         let totalVertexCount = 0
 
         for(let i = 0; i < 4; i ++) {
@@ -517,9 +532,7 @@ class PLYLoader {
             totalVertexCount += vertexCount;
 
             let rowOffset = 0;
-            let propCount = 0;
             const vertexProperties : PlyProperty[] = [];
-            globalRowOffsets.push(2*totalPropCount);
 
             for (const prop of headerText
                 .slice(start, end)
@@ -531,12 +544,8 @@ class PLYLoader {
                 vertexProperties.push({ name, type, offset: rowOffset });
                 if (!offsets[type]) throw new Error(`Unsupported property type: ${type}`);
                 rowOffset += offsets[type];
-                propOffset += offsets[type];
-                totalPropCount ++;
-                propCount ++;
             }
 
-            rowOffsetsWrite.push(2*propCount);
             properties.push(vertexProperties);
             rowOffsetsRead.push(rowOffset);
 
@@ -582,17 +591,13 @@ class PLYLoader {
         console.log("CODEBOOKS: ");
         console.log(cb);
 
-        let dataByteSizeWrite = 0;
-        const nbPropData = properties[0].length;
-        // console.log("for data: byte row length: " + (nbPropData*2));
-        for(let i = 0; i < 4; i ++) {
-            dataByteSizeWrite += vertexCounts[i]*nbPropData*2;
-        }
-
         const shRowLength = 4 * ((1*3) + (15*3)); //diffuse + 3 degrees of spherical harmonics in bytes
         const valDataView = new DataView(inputBuffer, header_end_index + header_end.length, dataByteSizeRead);
         const dataBuffer = new ArrayBuffer(Scene.RowLength * totalVertexCount);
         const shsBuffer = new ArrayBuffer(shRowLength * vertexCounts[3]);
+
+        console.log(`sh texture of size ${vertexCounts[3]} * ${shRowLength}`);
+        let testArr = new Float32Array(48);            
 
         let shLength = 0;
         //main loop
@@ -602,27 +607,22 @@ class PLYLoader {
             const vertexCount : number  = vertexCounts[i];
             const prop : PlyProperty[] = properties[i];
             // const rowOffsetWrite = rowOffsetsWrite[i];
-            const rowOffsetWrite = nbPropData*2;
             const rowOffsetRead = rowOffsetsRead[i];
-            console.log("row offset in read buffer in bytes: " + rowOffsetRead);
             
             if(i === 3) shLength = shRowLength;
-            
+
             for(let v = 0; v < vertexCount; v ++) {
                 const position = new Float32Array(dataBuffer, writeOffset + v * Scene.RowLength, 3);
                 const scale = new Float32Array(dataBuffer, writeOffset + v * Scene.RowLength + 12, 3);
                 const rgba = new Uint8ClampedArray(dataBuffer, writeOffset + v * Scene.RowLength + 24, 4);
                 const rot = new Uint8ClampedArray(dataBuffer, writeOffset + v * Scene.RowLength + 28, 4);
-                const sh = new Float32Array(shsBuffer, v * shLength, 48);
-                // const position = new Float32Array(dataBuffer, writeOffset + (v * rowOffsetWrite), 3);
-                // const scale = new Int16Array(dataBuffer, writeOffset + (v * rowOffsetWrite) + 6, 3);
-                // const rgba = new Int16Array(dataBuffer, writeOffset + (v * rowOffsetWrite) + 12, 4);
-                // const rot = new Int16Array(dataBuffer, writeOffset + (v * rowOffsetWrite) + 20, 4);
+                const sh = new Float32Array(shsBuffer, v * shLength, shLength/4);
 
                 let r0: number = 255;
                 let r1: number = 0;
                 let r2: number = 0;
                 let r3: number = 0; 
+
                 prop.forEach((property) => {
                     // FILL ARRAYS HERE?.
                     // console.log(``);
@@ -657,87 +657,77 @@ class PLYLoader {
 
                         let indexOfCb;
 
-                        if(property.name.startsWith("f_rest") && i === 3) {
+                        if(property.name.startsWith("f_rest")) {
                             const n44 = parseInt(property.name.split("_").slice(-1)[0]);
-                            const n14 = Math.floor(n44 / 3);
+                            // const n14 = Math.floor(n44 / 3);
+                            const n14 = n44 % 15;
                             indexOfCb = cbIndex[`features_rest_${n14}`];
 
                             // console.log(`f_rest${3+n44} maps to features_rest_${n14}`);
                             // console.log(`Index of cb features_rest_${n14} : ${indexOfCb}`);
 
                             value = cb[indexOfCb].data[index];
-                            
+
+                            // const index = 3 + ((n % 15)*3 + (n / 15));
                             //spherical harmonics coefficients
                             // const shIndex = 3 + (15*(n14 % 3) + Math.floor(n14/3));
                             // const shIndex = n14 + (n44%3)*15;
-                            const shIndex = Math.floor(n44/15) + 3*(n44 % 15);
-                            console.log(`${3+shIndex}: [${index}]`);
-
-                            coeff = decodeFloat16(new Int16Array([value]), 0, 3)[0];
+                            // const shIndex = Math.floor(n44/15) + 3*(n44 % 15);
+                            const shIndex =  3 + ((n44 % 15)*3 + Math.floor(n44 / 15));
+                            // console.log(`sh_${n44}: features_rest_${n14}`);
+                            coeff = decodeFloat16(new Int16Array([value]), 0, 1)[0];
+                            if(v == 0) testArr[3+n44] = coeff;
                             // console.log(``)
-                            sh[3+shIndex] = coeff
-                            // sh[3+n + 1] = shsRgb[1];
-                            // sh[3+n + 2] = shsRgb[2];
-        
+                            if(i == 3) sh[shIndex] = coeff;
+
                         } else {    
                             
-
                             switch (property.name) {
                                 case "scale_0":
                                     indexOfCb = cbIndex["scaling"];
                                     value = cb[indexOfCb].data[index];
     
-                                    // scale[0] = value & 0xff;
-                                    // scale[1] = value >> 8;
                                     coeff = decodeFloat16(new Int16Array([value]), 0, 1)[0];
                                     scale[0] = Math.exp(coeff);
                                     break;
                                 case "scale_1":
                                     indexOfCb = cbIndex["scaling"];
                                     value = cb[indexOfCb].data[index];
-    
-                                    // scale[2] = value & 0xff;
                                     coeff = decodeFloat16(new Int16Array([value]), 0, 1)[0];
+
                                     scale[1] = Math.exp(coeff);
                                     break;
                                 case "scale_2":
                                     indexOfCb = cbIndex["scaling"];
                                     value = cb[indexOfCb].data[index];
-                                    
-                                    // scale[4] = value & 0xff;
                                     coeff = decodeFloat16(new Int16Array([value]), 0, 1)[0];
+
                                     scale[2] = Math.exp(coeff);
                                     break;
                                 case "f_dc_0":
                                     indexOfCb = cbIndex["features_dc"];
                                     value = cb[indexOfCb].data[index];
-                                    // console.log(`f_dc_0: ${index}`);
                                     coeff = decodeFloat16(new Int16Array([value]), 0, 1)[0];
 
-                                    // rgba[0] = (0.5 + this.SH_C0 * rgba[0]) * 255;
-                                    rgba[0] = (0.5 + coeff) * 255;
-                                    sh[0] = coeff;
+                                    rgba[0] = (0.5 + this.SH_C0* coeff) * 255;
+                                    if(i===3) sh[0] = coeff;
+
                                     break;
                                 case "f_dc_1":
                                     indexOfCb = cbIndex["features_dc"];
                                     value = cb[indexOfCb].data[index];
-                                    // console.log(`f_dc_1: ${index}`);
                                     coeff = decodeFloat16(new Int16Array([value]), 0, 1)[0];
 
-                                    // rgba[0] = (0.5 + this.SH_C0 * rgba[0]) * 255;
-                                    rgba[1] = (0.5 + coeff) * 255;
-                                    sh[1] = coeff;
+                                    rgba[1] = (0.5 + this.SH_C0* coeff) * 255;
+                                    if(i===3) sh[1] = coeff;
                                     break;
                                 case "f_dc_2":
                                     indexOfCb = cbIndex["features_dc"];
                                     value = cb[indexOfCb].data[index];
-                                    // console.log(`f_dc_2: ${index}`);
-
                                     coeff = decodeFloat16(new Int16Array([value]), 0, 1)[0];
 
-                                    // rgba[0] = (0.5 + this.SH_C0 * rgba[0]) * 255;
-                                    rgba[2] = (0.5 + coeff) * 255;
-                                    sh[2] = coeff;
+                                    rgba[2] = (0.5 + this.SH_C0* coeff) * 255;
+                                    if(i===3) sh[2] = coeff;
                                     break;
                                 case "opacity":
                                     indexOfCb = cbIndex["opacity"];
@@ -791,10 +781,23 @@ class PLYLoader {
                     rot[2] = q.y * 128 + 128;
                     rot[3] = q.z * 128 + 128;
 
+                    // console.log(`vertex ${v} Scales ${scale}`);
+                    // console.log(`vertex ${v} Pos ${position}`);
+                    // console.log(`vertex ${v} rotation ${rot}`);
+                    // console.log(`vertex ${v} opacity ${rgba[3]}`);
+                    // if(i === 3) {
+                        
+                    //     for(let k = 0; k < 48; k ++) {
+                    //         console.log(`${k} : ${sh[k]}`);
+                    //     }
+                    //     // console.log(`vertex ${v} spherical harmonics ${sh}`);
+                    // }
                 }
                 
             writeOffset += vertexCount * Scene.RowLength;
             readOffset += vertexCount * rowOffsetRead;
+            
+            // console.log(testArr);
         }
 
         // let totalVertexCount = 0
@@ -804,9 +807,13 @@ class PLYLoader {
 
         console.log("total vertex count (all 4 sub point clouds): " + totalVertexCount);
 
-        // const fView = new Float32Array(shsBuffer);
-        // console.log("SHS RECOVERED ? ");
+        // const fView = new Float32Array(dataBuffer);
+        // console.log("FLOAT RECOVERED ? ");
         // console.log(fView);
+
+        // console.log("test array")
+        // console.log(testArr);
+
         return [dataBuffer, shsBuffer, vertexCounts[0]];
     }
 }

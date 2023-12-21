@@ -77,7 +77,7 @@ class Scene extends EventDispatcher {
             if(typeof shs != 'undefined') {
                 this._shHeight = Math.ceil((2 * g3bands) / this._width);
                 //padding added
-                this._shs = new Uint32Array(this._width* this._shHeight * 4);
+                // this._shs = new Uint32Array(this._width* this._shHeight * 4);
 
                 // no pad needed: 16F32 -> 8F32 using half16 packing so each sh texture is the same size as data texture !
                 this._shs_rgb = [

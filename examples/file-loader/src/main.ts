@@ -40,7 +40,8 @@ async function selectFile(file: File) {
             scene,
             undefined,
             format,
-            true
+            true,
+            true    // flag to use quantized parser or not
         );
     }
     loading = false;

@@ -168,7 +168,10 @@ void main () {
     vec3 rgb;
     float opacity = float((cov.w >> 24) & 0xffu) / 255.0;
     
-    use_shs = index > u_band0count;
+    if(index >= u_band0count) {
+        use_shs = true;
+    }
+
     //color based on spherical harmonics
     if(use_shs) {
         int tex_index = index - u_band0count;
