@@ -97,15 +97,12 @@ class PLYLoader {
 
                 let after = performance.now();
                 const data = new Uint8Array(rawData[0]);
-                const vertexCount = rawData[2];
                 const shData = new Float32Array(rawData[1]);
 
                 console.log("PLY file parsing loading took " + (after - before) + " ms.");
                 // console.log(data);
 
-                //  = vertexCount; //Nb of vertices having 0 bands.
                 before = performance.now();            
-                // scene.setDataQ(data, vertexCount);
                 // scene.setData(data);
                 scene.setData(data, shData);
                 after = performance.now();
@@ -369,7 +366,7 @@ class PLYLoader {
                 if(property.name.startsWith("f_rest")) {
                     //spherical harmonics coefficients
                     let n = parseInt(property.name.split("_").slice(-1)[0])
-                    const index = 3 + ((n % 15)*3 + (n / 15));
+                    const index = 3 + ((n % 15)*3 + Math.floor(n / 15));
                     sh[index] = value;
 
                 } else {
