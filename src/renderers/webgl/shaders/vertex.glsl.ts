@@ -103,8 +103,6 @@ vec3 eval_sh_rgb(highp usampler2D tex_r, highp usampler2D tex_g, highp usampler2
     return vec3(max(result.x, 0.), max(result.y, 0.), max(result.z, 0.));
 }
 
-
-
 uniform highp usampler2D u_texture;
 // uniform highp usampler2D u_shTexture;
 
@@ -156,11 +154,22 @@ void main () {
     mat3 T = transpose(mat3(view)) * J;
     mat3 cov2d = transpose(T) * Vrk * T;
 
+    // LOW PASS FILTER should be applied
+    cov2d[0][0] += 0.3f;
+    cov2d[1][1] += 0.3f;    
+
+    float det = (cov2d[0][0] * cov2d[1][1] - cov2d[0][1] * cov2d[0][1]);
+	if (det == 0.0f)
+		return;
+
+
     float mid = (cov2d[0][0] + cov2d[1][1]) / 2.0;
-    float radius = length(vec2((cov2d[0][0] - cov2d[1][1]) / 2.0, cov2d[0][1]));
-    float lambda1 = mid + radius, lambda2 = mid - radius;
+	float lambda1 = mid + sqrt(max(0.1f, mid * mid - det));
+	float lambda2 = mid - sqrt(max(0.1f, mid * mid - det));
+    float radius = ceil(3.f * sqrt(max(lambda1, lambda2)));
 
     if(lambda2 < 0.0) return;
+
     vec2 diagonalVector = normalize(vec2(cov2d[0][1], lambda1 - cov2d[0][0]));
     vec2 majorAxis = min(sqrt(2.0 * lambda1), 1024.0) * diagonalVector;
     vec2 minorAxis = min(sqrt(2.0 * lambda2), 1024.0) * vec2(diagonalVector.y, -diagonalVector.x);

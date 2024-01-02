@@ -35,7 +35,7 @@ export class WebGLRenderer {
         canvas.style.background = "#000";
         this.domElement = canvas;
 
-        const gl = canvas.getContext("webgl2", { antialias: false }) as WebGL2RenderingContext;
+        const gl = canvas.getContext("webgl2", { antialias: true }) as WebGL2RenderingContext;
         this.gl = gl;
 
         const shaderPasses = optionalShaderPasses || [];
@@ -311,8 +311,8 @@ export class WebGLRenderer {
         this.setCameraBuffers = () => {
             activeCamera.update(canvas.width, canvas.height);
 
-            // gl.uniformMatrix4fv(u_projection, false, activeCamera.projectionMatrix.buffer);
             // gl.uniform3fv(u_camPos, new Float32Array(activeCamera.position.flat()));
+            // gl.uniformMatrix4fv(u_projection, false, activeCamera.projectionMatrix.buffer);
             // gl.uniform2fv(u_focal, new Float32Array([activeCamera.fx, activeCamera.fy]));
             gl.uniformMatrix4fv(u_view, false, activeCamera.viewMatrix.buffer);
         };
