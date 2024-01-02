@@ -35,7 +35,7 @@ export class WebGLRenderer {
         canvas.style.background = "#000";
         this.domElement = canvas;
 
-        const gl = canvas.getContext("webgl2", { antialias: false, premultipliedAlpha: false }) as WebGL2RenderingContext;
+        const gl = canvas.getContext("webgl2", { antialias: false }) as WebGL2RenderingContext;
         this.gl = gl;
 
         const shaderPasses = optionalShaderPasses || [];
@@ -208,11 +208,7 @@ export class WebGLRenderer {
                 console.log("sh textures is filled: height " + activeScene.shHeight);
                 this.setShTextures();
             }
-            // if(activeScene.shs.length) {
-            //     gl.uniform1i(u_use_shs, 1);
-            //     this.setShTextures();
-            // }
-            
+
             u_texture = gl.getUniformLocation(program, "u_texture") as WebGLUniformLocation;
             gl.uniform1i(u_texture, 0);
             
@@ -277,9 +273,19 @@ export class WebGLRenderer {
                 }
                 gl.uniformMatrix4fv(u_view, false, activeCamera.viewMatrix.buffer);
 
-                // gl.colorMask(false, false, false, true);
+                gl.viewport(0, 0, canvas.width, canvas.height);
+
                 gl.clearColor(0, 0, 0, 0);
                 gl.clear(gl.COLOR_BUFFER_BIT);
+    
+                gl.disable(gl.DEPTH_TEST);
+                gl.enable(gl.BLEND);
+                gl.blendFuncSeparate(gl.ONE_MINUS_DST_ALPHA, gl.ONE, gl.ONE_MINUS_DST_ALPHA, gl.ONE);
+                gl.blendEquationSeparate(gl.FUNC_ADD, gl.FUNC_ADD);
+
+                // gl.colorMask(false, false, false, true);
+                // gl.clearColor(0, 0, 0, 0);
+                // gl.clear(gl.COLOR_BUFFER_BIT);
                 gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 4, activeScene.vertexCount);
             } else {
                 // gl.colorMask(false, false, false, true);

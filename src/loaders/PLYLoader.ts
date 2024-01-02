@@ -87,16 +87,16 @@ class PLYLoader {
                 let before = performance.now();
 
                 let rawData;
-                // const rawData = this._ParseFullPLYBuffer(e.target!.result as ArrayBuffer, format);
                 if(quantized) {
                     rawData = this._ParseQPLYBuffer(e.target!.result as ArrayBuffer, format);    
                     scene.g0bands= rawData[2];//Nb of vertices having 0 bands.
                 } else {
                     rawData = this._ParseFullPLYBuffer(e.target!.result as ArrayBuffer, format);
                 }
-
+                
                 let after = performance.now();
                 const data = new Uint8Array(rawData[0]);
+                // const data = new Uint8Array(this._ParsePLYBuffer(e.target!.result as ArrayBuffer, format));
                 const shData = new Float32Array(rawData[1]);
 
                 console.log("PLY file parsing loading took " + (after - before) + " ms.");
@@ -496,7 +496,7 @@ class PLYLoader {
             pcIndices.push(headerText.indexOf(el))
         });
 
-        let lutExtents : Array<Array<number>> = [
+        let extentsLut : Array<Array<number>> = [
             [0, pcIndices[1]],
             [pcIndices[1], pcIndices[2]],
             [pcIndices[2], pcIndices[3]],
@@ -519,17 +519,20 @@ class PLYLoader {
         let dataByteSizeRead = 0;
         const properties : Array<PlyProperty[]> = [];
         let rowOffsetsRead = [];
-        let totalVertexCount = 0
+        let totalVertexCount = 0;
+        let propIndex = [];
 
         for(let i = 0; i < 4; i ++) {
-            const vertexCount : number  = vertexCounts[i];
-            const start : number = lutExtents[i][0];
-            const end : number  = lutExtents[i][1]; 
+            const vertexCount : number = vertexCounts[i];
+            const start : number = extentsLut[i][0];
+            const end : number  = extentsLut[i][1]; 
             console.log(`${vertexCount} Vertices.`)
             totalVertexCount += vertexCount;
 
             let rowOffset = 0;
             const vertexProperties : PlyProperty[] = [];
+            let ind = 0;
+            let props : any = {};
 
             for (const prop of headerText
                 .slice(start, end)
@@ -541,15 +544,21 @@ class PLYLoader {
                 vertexProperties.push({ name, type, offset: rowOffset });
                 if (!offsets[type]) throw new Error(`Unsupported property type: ${type}`);
                 rowOffset += offsets[type];
+                props[name] = ind;
+                ind ++;
             }
-
+            
             properties.push(vertexProperties);
             rowOffsetsRead.push(rowOffset);
+            propIndex.push(props);
 
             dataByteSizeRead += vertexCount*rowOffset;
         }
         console.log("PROPERTIES ")
         console.log(properties);
+
+        console.log("PROPERTIES INDICES: ");
+        console.log(propIndex);
 
         // fill codebooks
         //cb contains each codebooks as int16Array(256)
@@ -596,6 +605,12 @@ class PLYLoader {
         console.log(`sh texture of size ${vertexCounts[3]} * ${shRowLength}`);
         let testArr = new Float32Array(48);            
 
+        const posLut: Record<string, number> = {
+            x: 0,
+            y: 1,
+            z: 2
+        };
+
         let shLength = 0;
         //main loop
         let writeOffset = 0;
@@ -605,8 +620,10 @@ class PLYLoader {
             const prop : PlyProperty[] = properties[i];
             // const rowOffsetWrite = rowOffsetsWrite[i];
             const rowOffsetRead = rowOffsetsRead[i];
-            
+            const pIndices = propIndex[i];
             if(i === 3) shLength = shRowLength;
+
+            const sh_prop = prop.filter((p) => p.name.startsWith("f_rest"));
 
             for(let v = 0; v < vertexCount; v ++) {
                 const position = new Float32Array(dataBuffer, writeOffset + v * Scene.RowLength, 3);
@@ -615,162 +632,87 @@ class PLYLoader {
                 const rot = new Uint8ClampedArray(dataBuffer, writeOffset + v * Scene.RowLength + 28, 4);
                 const sh = new Float32Array(shsBuffer, v * shLength, shLength/4);
 
-                let r0: number = 255;
-                let r1: number = 0;
-                let r2: number = 0;
-                let r3: number = 0; 
+                let r = [255, 0, 0, 0];
+                
+                // POSITION
+                const pX = prop[pIndices['x']];
+                let h = valDataView.getInt16(readOffset + pX.offset + v * rowOffsetRead, true);
+                position[0] = decodeFloat16(new Int16Array([h]), 0, 1)[0];
+                
+                const pY = prop[pIndices['y']];
+                h = valDataView.getInt16(readOffset + pY.offset + v * rowOffsetRead, true);
+                position[1] = decodeFloat16(new Int16Array([h]), 0, 1)[0];
 
-                prop.forEach((property) => {
-                    // FILL ARRAYS HERE?.
-                    // console.log(``);
+                const pZ = prop[pIndices['z']];
+                h = valDataView.getInt16(readOffset + pZ.offset + v * rowOffsetRead, true);
+                position[2] = decodeFloat16(new Int16Array([h]), 0, 1)[0];
 
-                    let value;
-                    let coeff;
-                    if(property.type === "short") {
-                        //position xyz
-                        value = valDataView.getInt16(readOffset + property.offset + v * rowOffsetRead, true);
-                        // console.log(`${property.name}: ${value}`);
+                let index;
+                let indexInCb;
+                let value;
 
-                        switch (property.name) {
+                // SCALING
+                for(let j = 0; j < 3; j ++) {
+                    const pScale = prop[pIndices[`scale_${j}`]];
+                    index = valDataView.getUint8(readOffset + pScale.offset + v * rowOffsetRead);
+                    indexInCb = cbIndex["scaling"];
+                    h = cb[indexInCb].data[index];
+                    value = decodeFloat16(new Int16Array([h]), 0, 1)[0];
+                    scale[j] = Math.exp(value);
+                }
 
-                            case "x":
-                                position[0] = decodeFloat16(new Int16Array([value]), 0, 1)[0];
-                                break;
-                            case "y":
-                                position[1] = decodeFloat16(new Int16Array([value]), 0, 1)[0];
-                                break;
-                            case "z":
-                                position[2] = decodeFloat16(new Int16Array([value]), 0, 1)[0];
-                                break;
-                        }
+                //ROTATION
+                const pRotRe = prop[pIndices["rot_0"]];
+                index = valDataView.getUint8(readOffset + pRotRe.offset + v * rowOffsetRead);
+                indexInCb = cbIndex["rotation_re"];
+                h = cb[indexInCb].data[index];
+                r[0] = decodeFloat16(new Int16Array([h]), 0, 1)[0];
 
-                    } else if(property.type === "uchar") {
-                        //index -> fetch value in codebook
-                        const index = valDataView.getUint8(readOffset + property.offset + v * rowOffsetRead);
-                        // console.log(`${property.name}: ${index}`);
-                        
-                        if(index > 255 || index < 0)
-                            throw new Error(`ACCESSING WRONG INDEX TO FETCH VALUE IN CODEBOOK: ${index}`);
+                for(let j = 1; j < 4; j ++) {
+                    const pRot = prop[pIndices[`rot_${j}`]];
+                    index = valDataView.getUint8(readOffset + pRot.offset + v * rowOffsetRead);
+                    indexInCb = cbIndex["rotation_im"];
+                    h = cb[indexInCb].data[index];
+                    r[j] = decodeFloat16(new Int16Array([h]), 0, 1)[0];
+                }
 
-                        let indexOfCb;
+                // DIFFUSE COMPONENT (RGBA + FILL SH COEFFS IF LAST POINTCLOUD)
+                for(let j = 0; j < 3; j ++) {
+                    const pCol = prop[pIndices[`f_dc_${j}`]];
+                    index = valDataView.getUint8(readOffset + pCol.offset + v * rowOffsetRead);
+                    indexInCb = cbIndex["features_dc"];
+                    h = cb[indexInCb].data[index];
+                    value = decodeFloat16(new Int16Array([h]), 0, 1)[0];
+                    rgba[j] = (0.5 + this.SH_C0* value) * 255;
+                    
+                    if(i == 3) sh[j] = value;
+                }
 
-                        if(property.name.startsWith("f_rest")) {
-                            const n44 = parseInt(property.name.split("_").slice(-1)[0]);
-                            // const n14 = Math.floor(n44 / 3);
-                            const n14 = n44 % 15;
-                            indexOfCb = cbIndex[`features_rest_${n14}`];
+                const pOpacity =  prop[pIndices["opacity"]];
+                index = valDataView.getUint8(readOffset + pOpacity.offset + v * rowOffsetRead);
+                indexInCb = cbIndex["opacity"];
+                h = cb[indexInCb].data[index];
+                value = decodeFloat16(new Int16Array([h]), 0, 1)[0];
+                rgba[3] = (1 / (1 + Math.exp(-value))) * 255;
 
-                            // console.log(`f_rest${3+n44} maps to features_rest_${n14}`);
-                            // console.log(`Index of cb features_rest_${n14} : ${indexOfCb}`);
+                //SPHERICAL HARMONICS
+                for(const p of sh_prop) {
+                    const n44 = parseInt(p.name.split("_").slice(-1)[0]);
+                    const n14 = n44 % 15;
 
-                            value = cb[indexOfCb].data[index];
+                    indexInCb = cbIndex[`features_rest_${n14}`];
+                    h = cb[indexInCb].data[index];
 
-                            // const index = 3 + ((n % 15)*3 + (n / 15));
-                            //spherical harmonics coefficients
-                            // const shIndex = 3 + (15*(n14 % 3) + Math.floor(n14/3));
-                            // const shIndex = n14 + (n44%3)*15;
-                            // const shIndex = Math.floor(n44/15) + 3*(n44 % 15);
-                            const shIndex =  3 + ((n44 % 15)*3 + Math.floor(n44 / 15));
-                            // console.log(`sh_${n44}: features_rest_${n14}`);
-                            coeff = decodeFloat16(new Int16Array([value]), 0, 1)[0];
-                            if(v == 0) testArr[3+n44] = coeff;
-                            // console.log(``)
-                            if(i == 3) sh[shIndex] = coeff;
+                    const shIndex =  3 + ((n44 % 15)*3 + Math.floor(n44 / 15));
+                    value = decodeFloat16(new Int16Array([h]), 0, 1)[0];
 
-                        } else {    
-                            
-                            switch (property.name) {
-                                case "scale_0":
-                                    indexOfCb = cbIndex["scaling"];
-                                    value = cb[indexOfCb].data[index];
-    
-                                    coeff = decodeFloat16(new Int16Array([value]), 0, 1)[0];
-                                    scale[0] = Math.exp(coeff);
-                                    break;
-                                case "scale_1":
-                                    indexOfCb = cbIndex["scaling"];
-                                    value = cb[indexOfCb].data[index];
-                                    coeff = decodeFloat16(new Int16Array([value]), 0, 1)[0];
-
-                                    scale[1] = Math.exp(coeff);
-                                    break;
-                                case "scale_2":
-                                    indexOfCb = cbIndex["scaling"];
-                                    value = cb[indexOfCb].data[index];
-                                    coeff = decodeFloat16(new Int16Array([value]), 0, 1)[0];
-
-                                    scale[2] = Math.exp(coeff);
-                                    break;
-                                case "f_dc_0":
-                                    indexOfCb = cbIndex["features_dc"];
-                                    value = cb[indexOfCb].data[index];
-                                    coeff = decodeFloat16(new Int16Array([value]), 0, 1)[0];
-
-                                    rgba[0] = (0.5 + this.SH_C0* coeff) * 255;
-                                    if(i===3) sh[0] = coeff;
-
-                                    break;
-                                case "f_dc_1":
-                                    indexOfCb = cbIndex["features_dc"];
-                                    value = cb[indexOfCb].data[index];
-                                    coeff = decodeFloat16(new Int16Array([value]), 0, 1)[0];
-
-                                    rgba[1] = (0.5 + this.SH_C0* coeff) * 255;
-                                    if(i===3) sh[1] = coeff;
-                                    break;
-                                case "f_dc_2":
-                                    indexOfCb = cbIndex["features_dc"];
-                                    value = cb[indexOfCb].data[index];
-                                    coeff = decodeFloat16(new Int16Array([value]), 0, 1)[0];
-
-                                    rgba[2] = (0.5 + this.SH_C0* coeff) * 255;
-                                    if(i===3) sh[2] = coeff;
-                                    break;
-                                case "opacity":
-                                    indexOfCb = cbIndex["opacity"];
-                                    value = cb[indexOfCb].data[index];
-                                    coeff = decodeFloat16(new Int16Array([value]), 0, 1)[0];
-
-                                    rgba[3] = (1 / (1 + Math.exp(-coeff))) * 255;
-                                    break;
-                                case "rot_0":
-                                    indexOfCb = cbIndex["rotation_re"];
-                                    value = cb[indexOfCb].data[index];
-                                    coeff = decodeFloat16(new Int16Array([value]), 0, 1)[0];
-
-                                    r0 = coeff;
-                                    break;
-                                case "rot_1":
-                                    indexOfCb = cbIndex["rotation_im"];
-                                    value = cb[indexOfCb].data[index];
-                                    coeff = decodeFloat16(new Int16Array([value]), 0, 1)[0];
-
-                                    r1 = coeff;
-                                    break;
-                                case "rot_2":
-                                    indexOfCb = cbIndex["rotation_im"];
-                                    value = cb[indexOfCb].data[index];
-                                    coeff = decodeFloat16(new Int16Array([value]), 0, 1)[0];
-
-                                    r2 = coeff;
-                                    break;
-                                case "rot_3":
-                                    indexOfCb = cbIndex["rotation_im"];
-                                    value = cb[indexOfCb].data[index];  
-                                    coeff = decodeFloat16(new Int16Array([value]), 0, 1)[0];
-
-                                    r3 = coeff;
-                                    break;
-                            }
-                        }
+                    // if(v == 0) testArr[3+n44] = coeff;
+                    // console.log(``)
+                    if(i == 3) sh[shIndex] = value;
+                }
 
 
-                    } else {
-                        throw new Error(`Unsupported property type: ${property.type}`);
-                    }
-                });
-
-                    let q = new Quaternion(r1, r2, r3, r0);
+                    let q = new Quaternion(r[1], r[2], r[3], r[0]);
 
                     q = q.normalize();
                     rot[0] = q.w * 128 + 128;

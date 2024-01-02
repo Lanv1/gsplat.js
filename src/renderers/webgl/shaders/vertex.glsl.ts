@@ -172,10 +172,12 @@ void main () {
         use_shs = true;
     }
 
+    // use_shs = false;
+
     //color based on spherical harmonics
     if(use_shs) {
         int tex_index = index - u_band0count;
-        const uint deg = 3u;    //degree per gaussian can be set (would have to store it in sh texture padding).
+        const uint deg = 3u;    
         mat4 inverted_view = inverse(view);
         vec3 dir = normalize(p - inverted_view[3].xyz);
 
