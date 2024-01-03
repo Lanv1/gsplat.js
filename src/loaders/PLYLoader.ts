@@ -617,6 +617,7 @@ class PLYLoader {
         //main loop
         let writeOffset = 0;
         let readOffset = 0;
+        let shOffset = 0;
         for(let i = 0; i < 4; i ++) {
             const vertexCount : number  = vertexCounts[i];
             const prop : PlyProperty[] = properties[i];
@@ -633,7 +634,7 @@ class PLYLoader {
                 const scale = new Float32Array(dataBuffer, writeOffset + v * Scene.RowLength + 12, 3);
                 const rgba = new Uint8ClampedArray(dataBuffer, writeOffset + v * Scene.RowLength + 24, 4);
                 const rot = new Uint8ClampedArray(dataBuffer, writeOffset + v * Scene.RowLength + 28, 4);
-                const sh = new Float32Array(shsBuffer, v * shLength, shLength/4);
+                const sh = new Float32Array(shsBuffer, shOffset + v * shLength, shLength/4);
 
                 let r = [255, 0, 0, 0];
                 
@@ -739,6 +740,7 @@ class PLYLoader {
             writeOffset += vertexCount * Scene.RowLength;
             readOffset += vertexCount * rowOffsetRead;
             
+            if(i > 0) shOffset += vertexCount * shLength;
             // console.log(testArr);
         }
 
