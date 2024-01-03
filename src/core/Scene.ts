@@ -53,7 +53,7 @@ class Scene extends EventDispatcher {
         this._shs = new Uint32Array(0);
         this._shs_rgb = [new Uint32Array(0), new Uint32Array(0), new Uint32Array(0)];
         this._g0bands = 0;
-        this._bandsIndices = new Int32Array(0);
+        this._bandsIndices = new Int32Array([-1, -1 , -1]);
 
         this.setData = (data: Uint8Array, shs?: Float32Array) => {
             if(typeof shs == 'undefined') {
@@ -64,6 +64,13 @@ class Scene extends EventDispatcher {
             console.log("VERTEX COUNT (for data storage in tex ): " + this._vertexCount);
             // const g3bands = this.vertexCount - (this.bandsIndices[0]+1);
             const shSize = this.vertexCount - (this.bandsIndices[0]+1);
+            
+            // let shSize;
+            // if(this.bandsIndices[0] > 0) {
+            //     shSize = this.vertexCount - (this.bandsIndices[0]+1);
+            // } else {
+            //     shSize = this.vertexCount;
+            // }
             
             console.log(`${shSize} gaussians with 1,2 or 3 bands.`);
 
