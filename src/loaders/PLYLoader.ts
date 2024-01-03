@@ -50,15 +50,26 @@ class PLYLoader {
         }
 
         if(useShs) {
-            let before = performance.now();
             // const rawData = this._ParseFullPLYBuffer(plyData.buffer, format);
-            const rawData = this._ParseQPLYBuffer(plyData.buffer, format);
+
+
+            let before = performance.now();
+
+            let rawData;
+            if(quantized) {
+                rawData = this._ParseQPLYBuffer(plyData.buffer, format);    
+                scene.bandsIndices = rawData[2]; //Indices of last gaussians having 0, 1 or 2 bands activated
+                // scene.g0bands= rawData[2]; //Nb of vertices having 0 bands.
+            } else {
+                rawData = this._ParseFullPLYBuffer(plyData.buffer, format);
+            }
             let after = performance.now();
 
             console.log("PLY file parsing loading took " + (after - before) + " ms.");
-            
+
             const data = new Uint8Array(rawData[0]);
             const shData = new Float32Array(rawData[1]);
+            
             before = performance.now();
             scene.setData(data, shData);
             after = performance.now();
