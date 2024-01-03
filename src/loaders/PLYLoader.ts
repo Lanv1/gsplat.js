@@ -89,7 +89,9 @@ class PLYLoader {
                 let rawData;
                 if(quantized) {
                     rawData = this._ParseQPLYBuffer(e.target!.result as ArrayBuffer, format);    
-                    scene.g0bands= rawData[2];//Nb of vertices having 0 bands.
+
+                    scene.bandsIndices = rawData[2]; //Indices of last gaussians having 0, 1 or 2 bands activated
+                    // scene.g0bands= rawData[2]; //Nb of vertices having 0 bands.
                 } else {
                     rawData = this._ParseFullPLYBuffer(e.target!.result as ArrayBuffer, format);
                 }
@@ -467,7 +469,7 @@ class PLYLoader {
     }
 
     // parse quantized ply
-    private static _ParseQPLYBuffer(inputBuffer: ArrayBuffer, format: string): [ArrayBuffer, ArrayBuffer, number] {
+    private static _ParseQPLYBuffer(inputBuffer: ArrayBuffer, format: string): [ArrayBuffer, ArrayBuffer, Int32Array] {
         type PlyProperty = {
             name: string;
             type: string;
@@ -600,7 +602,7 @@ class PLYLoader {
         const shRowLength = 4 * ((1*3) + (15*3)); //diffuse + 3 degrees of spherical harmonics in bytes
         const valDataView = new DataView(inputBuffer, header_end_index + header_end.length, dataByteSizeRead);
         const dataBuffer = new ArrayBuffer(Scene.RowLength * totalVertexCount);
-        const shsBuffer = new ArrayBuffer(shRowLength * vertexCounts[3]);
+        const shsBuffer = new ArrayBuffer(shRowLength * (vertexCounts[1] + vertexCounts[2] + vertexCounts[3]));
 
         console.log(`sh texture of size ${vertexCounts[3]} * ${shRowLength}`);
         let testArr = new Float32Array(48);            
@@ -621,7 +623,8 @@ class PLYLoader {
             // const rowOffsetWrite = rowOffsetsWrite[i];
             const rowOffsetRead = rowOffsetsRead[i];
             const pIndices = propIndex[i];
-            if(i === 3) shLength = shRowLength;
+
+            if(i > 0) shLength = shRowLength;
 
             const sh_prop = prop.filter((p) => p.name.startsWith("f_rest"));
 
@@ -685,7 +688,7 @@ class PLYLoader {
                     value = decodeFloat16(new Int16Array([h]), 0, 1)[0];
                     rgba[j] = (0.5 + this.SH_C0* value) * 255;
                     
-                    if(i == 3) sh[j] = value;
+                    if(i > 0) sh[j] = value;
                 }
 
                 const pOpacity =  prop[pIndices["opacity"]];
@@ -708,7 +711,7 @@ class PLYLoader {
 
                     // if(v == 0) testArr[3+n44] = coeff;
                     // console.log(``)
-                    if(i == 3) sh[shIndex] = value;
+                    if(i > 0) sh[shIndex] = value;
                 }
 
 
@@ -752,8 +755,13 @@ class PLYLoader {
 
         // console.log("test array")
         // console.log(testArr);
+        
+        // INDi: INDICE OF LAST GAUSSIAN HAVING i BANDS ACTIVATED
+        const ind0 = vertexCounts[0]-1;
+        const ind1 = ind0 + vertexCounts[1];
+        const ind2 = ind1 + vertexCounts[2];
 
-        return [dataBuffer, shsBuffer, vertexCounts[0]];
+        return [dataBuffer, shsBuffer, new Int32Array([ind0, ind1, ind2])];
     }
 }
 

@@ -119,7 +119,7 @@ uniform bool u_useDepthFade;
 uniform float u_depthFade;
 
 // uniform bool u_use_shs;
-uniform int u_band0count;
+uniform ivec3 u_bandIndex;
 
 in vec2 position;
 in int index;
@@ -177,7 +177,7 @@ void main () {
     vec3 rgb;
     float opacity = float((cov.w >> 24) & 0xffu) / 255.0;
     
-    if(index >= u_band0count) {
+    if(index > u_bandIndex[0]) {
         use_shs = true;
     }
 
@@ -185,8 +185,9 @@ void main () {
 
     //color based on spherical harmonics
     if(use_shs) {
-        int tex_index = index - u_band0count;
-        const uint deg = 3u;    
+        int tex_index = index - (u_bandIndex[0]+1);
+        uint deg = index > u_bandIndex[1] ? index > u_bandIndex[2] ? 3u : 2u : 1u;    
+        // uint deg = 3u;    
         mat4 inverted_view = inverse(view);
         vec3 dir = normalize(p - inverted_view[3].xyz);
 

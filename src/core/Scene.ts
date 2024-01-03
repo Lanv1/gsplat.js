@@ -18,8 +18,8 @@ class Scene extends EventDispatcher {
     private _shs: Uint32Array;
     private _shHeight: number;
 
-    private _qdata: Uint32Array;
     private _g0bands: number;
+    private _bandsIndices: Int32Array;
 
 
     private _shs_rgb: [Uint32Array, Uint32Array, Uint32Array];
@@ -52,8 +52,8 @@ class Scene extends EventDispatcher {
         this._scales = new Float32Array(0);
         this._shs = new Uint32Array(0);
         this._shs_rgb = [new Uint32Array(0), new Uint32Array(0), new Uint32Array(0)];
-        this._qdata = new Uint32Array(0);
         this._g0bands = 0;
+        this._bandsIndices = new Int32Array(0);
 
         this.setData = (data: Uint8Array, shs?: Float32Array) => {
             if(typeof shs == 'undefined') {
@@ -62,7 +62,7 @@ class Scene extends EventDispatcher {
             this._vertexCount = data.length / Scene.RowLength;
             
             console.log("VERTEX COUNT (for data storage in tex ): " + this._vertexCount);
-            const g3bands = this.vertexCount - this.g0bands;
+            const g3bands = this.vertexCount - (this.bandsIndices[0]+1);
             
             console.log(`${g3bands} gaussians with 3 bands.`);
 
@@ -444,16 +444,20 @@ class Scene extends EventDispatcher {
         return this._shHeight;
     }
 
-    get qdata() {
-        return this._qdata
-    }
-
     get g0bands() {
         return this._g0bands;
     }
 
     set g0bands(nbGaussian0bands: number) {
         this._g0bands = nbGaussian0bands;
+    }
+
+    get bandsIndices() {
+        return this._bandsIndices;
+    }
+
+    set bandsIndices(bIndices: Int32Array) {
+        this._bandsIndices = bIndices;
     }
 }
 

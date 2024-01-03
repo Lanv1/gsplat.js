@@ -35,7 +35,7 @@ export class WebGLRenderer {
         canvas.style.background = "#000";
         this.domElement = canvas;
 
-        const gl = canvas.getContext("webgl2", { antialias: true }) as WebGL2RenderingContext;
+        const gl = canvas.getContext("webgl2", { antialias: false }) as WebGL2RenderingContext;
         this.gl = gl;
 
         const shaderPasses = optionalShaderPasses || [];
@@ -60,13 +60,12 @@ export class WebGLRenderer {
         let u_view: WebGLUniformLocation;
         let u_texture: WebGLUniformLocation;
         let u_camPos: WebGLUniformLocation;
-        let u_band0count: WebGLUniformLocation;
+        let u_bandIndex: WebGLUniformLocation;
 
         let u_tex_sh_r: WebGLUniformLocation;
         let u_tex_sh_g: WebGLUniformLocation;
         let u_tex_sh_b: WebGLUniformLocation;
         
-        let u_use_shs: WebGLUniformLocation;
         
         let positionAttribute: number;
         let indexAttribute: number;
@@ -199,14 +198,16 @@ export class WebGLRenderer {
             // u_use_shs = gl.getUniformLocation(program, "u_use_shs") as WebGLUniformLocation;
             // gl.uniform1i(u_use_shs, 0);
             
-            console.log(`u_band0count should be ${activeScene.g0bands}`);
-
-            u_band0count = gl.getUniformLocation(program, "u_band0count") as WebGLUniformLocation;
-            gl.uniform1i(u_band0count, activeScene.g0bands);
             
             if(activeScene.shHeight) {
                 console.log("sh textures is filled: height " + activeScene.shHeight);
                 this.setShTextures();
+
+                console.log(`u_band0count should be ${activeScene.g0bands}`);
+                console.log("bands indices: ")
+                console.log(activeScene.bandsIndices);
+                u_bandIndex = gl.getUniformLocation(program, "u_bandIndex") as WebGLUniformLocation;
+                gl.uniform3iv(u_bandIndex, new Int32Array([activeScene.bandsIndices[0], activeScene.bandsIndices[1], activeScene.bandsIndices[2]]));
             }
 
             u_texture = gl.getUniformLocation(program, "u_texture") as WebGLUniformLocation;
