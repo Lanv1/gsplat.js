@@ -62,9 +62,10 @@ class Scene extends EventDispatcher {
             this._vertexCount = data.length / Scene.RowLength;
             
             console.log("VERTEX COUNT (for data storage in tex ): " + this._vertexCount);
-            const g3bands = this.vertexCount - (this.bandsIndices[0]+1);
+            // const g3bands = this.vertexCount - (this.bandsIndices[0]+1);
+            const shSize = this.vertexCount - (this.bandsIndices[0]+1);
             
-            console.log(`${g3bands} gaussians with 3 bands.`);
+            console.log(`${shSize} gaussians with 1,2 or 3 bands.`);
 
             this._height = Math.ceil((2 * this._vertexCount) / this._width);
             this._data = new Uint32Array(this._width * this._height * 4);
@@ -74,7 +75,7 @@ class Scene extends EventDispatcher {
 
             let shs_ind = 0;
             if(typeof shs != 'undefined') {
-                this._shHeight = Math.ceil((2 * g3bands) / this._width);
+                this._shHeight = Math.ceil((2 * shSize) / this._width);
                 //padding added
                 // this._shs = new Uint32Array(this._width* this._shHeight * 4);
 
@@ -96,7 +97,7 @@ class Scene extends EventDispatcher {
             const stride = 3;
 
             if(typeof shs != 'undefined') {
-                for(let i = 0; i < g3bands; i ++) {
+                for(let i = 0; i < shSize; i ++) {
                     // pack input F32 shs to H16 inside the scene.
                     // for(let j = 0; j < 48; j +=2) {
                     //     this._shs[shs_ind] = packHalf2x16(shs[i*48+j], shs[i*48+(j+1)]);

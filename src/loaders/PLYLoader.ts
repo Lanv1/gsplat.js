@@ -605,19 +605,15 @@ class PLYLoader {
         const shsBuffer = new ArrayBuffer(shRowLength * (vertexCounts[1] + vertexCounts[2] + vertexCounts[3]));
 
         console.log(`sh texture of size ${vertexCounts[3]} * ${shRowLength}`);
-        let testArr = new Float32Array(48);            
 
-        const posLut: Record<string, number> = {
-            x: 0,
-            y: 1,
-            z: 2
-        };
-
-        let shLength = 0;
         //main loop
+        let shLength = 0;
         let writeOffset = 0;
         let readOffset = 0;
         let shOffset = 0;
+
+        const shStrideLut = [3, 8, 15];
+        let shStride = 0;
         for(let i = 0; i < 4; i ++) {
             const vertexCount : number  = vertexCounts[i];
             const prop : PlyProperty[] = properties[i];
@@ -625,7 +621,10 @@ class PLYLoader {
             const rowOffsetRead = rowOffsetsRead[i];
             const pIndices = propIndex[i];
 
-            if(i > 0) shLength = shRowLength;
+            if(i > 0){
+                shLength = shRowLength;
+                shStride = shStrideLut[i-1];
+            } 
 
             const sh_prop = prop.filter((p) => p.name.startsWith("f_rest"));
 
@@ -702,17 +701,19 @@ class PLYLoader {
                 //SPHERICAL HARMONICS
                 for(const p of sh_prop) {
                     const n44 = parseInt(p.name.split("_").slice(-1)[0]);
-                    const n14 = n44 % 15;
+                    const n14 = n44 % shStride;
+                    
+                    index = valDataView.getUint8(readOffset + p.offset + v * rowOffsetRead);
 
                     indexInCb = cbIndex[`features_rest_${n14}`];
                     h = cb[indexInCb].data[index];
 
-                    const shIndex =  3 + ((n44 % 15)*3 + Math.floor(n44 / 15));
+                    const shIndex =  3 + ((n44 % shStride)*3 + Math.floor(n44 / shStride));
                     value = decodeFloat16(new Int16Array([h]), 0, 1)[0];
 
                     // if(v == 0) testArr[3+n44] = coeff;
                     // console.log(``)
-                    if(i > 0) sh[shIndex] = value;
+                    sh[shIndex] = value;
                 }
 
 
@@ -728,36 +729,18 @@ class PLYLoader {
                     // console.log(`vertex ${v} Pos ${position}`);
                     // console.log(`vertex ${v} rotation ${rot}`);
                     // console.log(`vertex ${v} opacity ${rgba[3]}`);
-                    // if(i === 3) {
-                        
-                    //     for(let k = 0; k < 48; k ++) {
-                    //         console.log(`${k} : ${sh[k]}`);
-                    //     }
-                    //     // console.log(`vertex ${v} spherical harmonics ${sh}`);
-                    // }
                 }
                 
             writeOffset += vertexCount * Scene.RowLength;
             readOffset += vertexCount * rowOffsetRead;
             
             if(i > 0) shOffset += vertexCount * shLength;
+
+
             // console.log(testArr);
         }
 
-        // let totalVertexCount = 0
-        // for(let i = 0; i < 4; i ++) {
-        //     totalVertexCount += vertexCounts[i];
-        // }
 
-        console.log("total vertex count (all 4 sub point clouds): " + totalVertexCount);
-
-        // const fView = new Float32Array(dataBuffer);
-        // console.log("FLOAT RECOVERED ? ");
-        // console.log(fView);
-
-        // console.log("test array")
-        // console.log(testArr);
-        
         // INDi: INDICE OF LAST GAUSSIAN HAVING i BANDS ACTIVATED
         const ind0 = vertexCounts[0]-1;
         const ind1 = ind0 + vertexCounts[1];

@@ -186,8 +186,16 @@ void main () {
     //color based on spherical harmonics
     if(use_shs) {
         int tex_index = index - (u_bandIndex[0]+1);
-        // uint deg = index > u_bandIndex[1] ? index > u_bandIndex[2] ? 3u : 2u : 1u;    
-        uint deg = 3u;    
+        uint deg = index > u_bandIndex[1] ? index > u_bandIndex[2] ? 3u : 2u : 1u;    
+        // uint deg = 1u;    
+
+        // if(index > u_bandIndex.y) {
+        //     deg ++;
+        //     if(index > u_bandIndex.z) {
+        //         deg ++;
+        //     }
+        // }
+
         mat4 inverted_view = inverse(view);
         vec3 dir = normalize(p - inverted_view[3].xyz);
 
