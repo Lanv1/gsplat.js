@@ -50,7 +50,7 @@ async function selectFile(file: File) {
 async function main() {
     // Load a placeholder scene
     // const url = "https://huggingface.co/datasets/dylanebert/3dgs/resolve/main/bicycle/point_cloud/iteration_30000/point_cloud.ply";
-    const url = "https://huggingface.co/datasets/dylanebert/3dgs/resolve/main/bonsai/point_cloud/iteration_7000/point_cloud.ply";
+    const url = "https://repo-sam.inria.fr/fungraph/reduced_3dgs/bicycle/quantized_bicycle.ply";
     await SPLAT.PLYLoader.LoadAsync(url, scene, () => {}, "", true);
 
     camFileElem?.addEventListener("change", (event : Event) => {
