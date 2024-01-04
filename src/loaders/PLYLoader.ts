@@ -11,7 +11,7 @@ class PLYLoader {
     static async LoadAsync(
         url: string,
         scene: Scene,
-        onProgress?: (progress: number) => void,
+        onProgress?: (progress: number, loadingDone?: boolean) => void,
         format: string = "",
         useShs: boolean = false,
         quantized: boolean = false
@@ -42,6 +42,9 @@ class PLYLoader {
 
             onProgress?.(bytesRead / contentLength);
         }
+
+        onProgress?.(bytesRead / contentLength, true);
+        
         const loadTime = performance.now() - this.timestamp;
         console.log(`File loaded in ${loadTime}ms.`);
 
