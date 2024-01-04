@@ -17,7 +17,7 @@ class PLYLoader {
         quantized: boolean = false
     ): Promise<void> {
         const req = await fetch(url, {
-            mode: "no-cors",
+            mode: "cors",
             credentials: "omit",
         });
 
