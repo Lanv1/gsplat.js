@@ -5,11 +5,11 @@ const scene = new SPLAT.Scene();
 let camera = new SPLAT.Camera();
 let controls = new SPLAT.OrbitControls(camera, renderer.domElement);
 
-const camFileElem = document.getElementById("input_cam");
-const exportBtnElem = document.getElementById("exportBtn");
-const screenshotBtnElem = document.getElementById("screenshot");
-const camSelectorBtnElem = document.getElementById("camSelector");
-let camSelectorLabelElem = document.getElementById("selectedCam");
+// const camFileElem = document.getElementById("input_cam");
+// const exportBtnElem = document.getElementById("exportBtn");
+// const screenshotBtnElem = document.getElementById("screenshot");
+// const camSelectorBtnElem = document.getElementById("camSelector");
+// let camSelectorLabelElem = document.getElementById("selectedCam");
 
 let loading = false;
 let selectedCam = 0;
@@ -50,72 +50,73 @@ async function selectFile(file: File) {
 async function main() {
     // Load a placeholder scene
     // const url = "https://huggingface.co/datasets/dylanebert/3dgs/resolve/main/bicycle/point_cloud/iteration_30000/point_cloud.ply";
-    const url = "https://repo-sam.inria.fr/fungraph/reduced_3dgs/bicycle/quantized_bicycle.ply";
-    await SPLAT.PLYLoader.LoadAsync(url, scene, () => {}, "", true);
+    // const url = "https://repo-sam.inria.fr/fungraph/reduced_3dgs/bicycle/quantized_bicycle.ply";
+    // const url = "https://huggingface.co/datasets/dylanebert/3dgs/resolve/main/counter/point_cloud/iteration_7000/point_cloud.ply";
+    // await SPLAT.PLYLoader.LoadAsync(url, scene, () => {}, "", true);
 
-    camFileElem?.addEventListener("change", (event : Event) => {
-        const input = event.target as HTMLInputElement;
-        if(input.files && input.files.length) {
-            const file = input.files[0];
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                cameras = JSON.parse(e.target!.result as string);
-                // camera.setFromData(cameras[selectedCam]);
+    // camFileElem?.addEventListener("change", (event : Event) => {
+    //     const input = event.target as HTMLInputElement;
+    //     if(input.files && input.files.length) {
+    //         const file = input.files[0];
+    //         const reader = new FileReader();
+    //         reader.onload = (e) => {
+    //             cameras = JSON.parse(e.target!.result as string);
+    //             // camera.setFromData(cameras[selectedCam]);
 
-                camera = SPLAT.Camera.fromData(cameras[selectedCam]);
-                controls.setCamera(camera);
-                // controls = new SPLAT.OrbitControls(camera, renderer.domElement);
-                // controls.setCameraTarget(camera.position);
-            };
-            reader.onprogress = (e) => {
-            };
-            reader.readAsText(file);
-            new Promise<void>((resolve) => {
-                reader.onloadend = () => {
-                    resolve();
-                };
-            });
+    //             camera = SPLAT.Camera.fromData(cameras[selectedCam]);
+    //             controls.setCamera(camera);
+    //             // controls = new SPLAT.OrbitControls(camera, renderer.domElement);
+    //             // controls.setCameraTarget(camera.position);
+    //         };
+    //         reader.onprogress = (e) => {
+    //         };
+    //         reader.readAsText(file);
+    //         new Promise<void>((resolve) => {
+    //             reader.onloadend = () => {
+    //                 resolve();
+    //             };
+    //         });
             
-            (camSelectorLabelElem as HTMLInputElement).value = "0";
-        }
-    });
+    //         (camSelectorLabelElem as HTMLInputElement).value = "0";
+    //     }
+    // });
 
-    exportBtnElem?.addEventListener("click", (event: Event) => {
-        console.log("export clicked");
-        camera.dumpSettings(renderer.domElement.width, renderer.domElement.height);
-    });
+    // exportBtnElem?.addEventListener("click", (event: Event) => {
+    //     console.log("export clicked");
+    //     camera.dumpSettings(renderer.domElement.width, renderer.domElement.height);
+    // });
     
-    camSelectorBtnElem?.addEventListener("click", (event: Event) => {
-        console.log("next cam clicked");
-        const nbCam = cameras.length;
-        selectedCam = (selectedCam + 1) % nbCam;
+    // camSelectorBtnElem?.addEventListener("click", (event: Event) => {
+    //     console.log("next cam clicked");
+    //     const nbCam = cameras.length;
+    //     selectedCam = (selectedCam + 1) % nbCam;
         
-        // camera.setFromData(cameras[selectedCam]);
-        camera = SPLAT.Camera.fromData(cameras[selectedCam]);
-        controls.setCamera(camera);
+    //     // camera.setFromData(cameras[selectedCam]);
+    //     camera = SPLAT.Camera.fromData(cameras[selectedCam]);
+    //     controls.setCamera(camera);
 
         
-        (camSelectorLabelElem as HTMLInputElement).value = selectedCam.toString();
-    });
+    //     (camSelectorLabelElem as HTMLInputElement).value = selectedCam.toString();
+    // });
     
-    camSelectorLabelElem?.addEventListener("input", (event: Event) => {
-        const val : number = parseInt((event.target  as HTMLInputElement).value);
+    // camSelectorLabelElem?.addEventListener("input", (event: Event) => {
+    //     const val : number = parseInt((event.target  as HTMLInputElement).value);
         
-        if (val < cameras.length) {
-            selectedCam = val;
-            camera = SPLAT.Camera.fromData(cameras[selectedCam]);
-            controls.setCamera(camera);        
-        }
-    });
+    //     if (val < cameras.length) {
+    //         selectedCam = val;
+    //         camera = SPLAT.Camera.fromData(cameras[selectedCam]);
+    //         controls.setCamera(camera);        
+    //     }
+    // });
 
-    screenshotBtnElem?.addEventListener("click", (ev: Event) => { 
-        renderer.render(scene, camera);
-        renderer.domElement.toBlob((blob : any) =>  window.open(URL.createObjectURL(blob), '_blank'));
+    // screenshotBtnElem?.addEventListener("click", (ev: Event) => { 
+    //     renderer.render(scene, camera);
+    //     renderer.domElement.toBlob((blob : any) =>  window.open(URL.createObjectURL(blob), '_blank'));
 
-        // const dataURL = renderer.domElement.toDataURL("image/png");
-        // let newTab = window.open('about:blank','image from canvas');
-        // newTab?.document.write("<img src='" + dataURL + "' alt='from canvas'/>");        
-    });
+    //     // const dataURL = renderer.domElement.toDataURL("image/png");
+    //     // let newTab = window.open('about:blank','image from canvas');
+    //     // newTab?.document.write("<img src='" + dataURL + "' alt='from canvas'/>");        
+    // });
 
     // Render loop
     const frame = () => {

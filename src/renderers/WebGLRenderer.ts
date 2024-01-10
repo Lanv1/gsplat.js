@@ -200,12 +200,12 @@ export class WebGLRenderer {
             
             
             if(activeScene.shHeight) {
-                console.log("sh textures is filled: height " + activeScene.shHeight);
+                // console.log("sh textures is filled: height " + activeScene.shHeight);
                 this.setShTextures();
 
-                console.log(`u_band0count should be ${activeScene.g0bands}`);
-                console.log("bands indices: ")
-                console.log(activeScene.bandsIndices);
+                // console.log(`u_band0count should be ${activeScene.g0bands}`);
+                // console.log("bands indices: ")
+                // console.log(activeScene.bandsIndices);
                 u_bandIndex = gl.getUniformLocation(program, "u_bandIndex") as WebGLUniformLocation;
                 gl.uniform3iv(u_bandIndex, new Int32Array([activeScene.bandsIndices[0], activeScene.bandsIndices[1], activeScene.bandsIndices[2]]));
             }

@@ -484,6 +484,10 @@ class PLYLoader {
 
     // parse quantized ply
     private static _ParseQPLYBuffer(inputBuffer: ArrayBuffer, format: string): [ArrayBuffer, ArrayBuffer, Int32Array] {
+
+        console.log("parsing ...")
+
+        let before = performance.now();
         type PlyProperty = {
             name: string;
             type: string;
@@ -492,7 +496,7 @@ class PLYLoader {
 
         type CodeBook = {
             name: string,
-            data: Int16Array
+            data: Float32Array
         };
 
         const ubuf = new Uint8Array(inputBuffer);
@@ -519,7 +523,7 @@ class PLYLoader {
             [pcIndices[3], start_codebook_index]
         ];
         
-        console.log(vertexCounts);
+        // console.log(vertexCounts);
         
         const offsets: Record<string, number> = {
             double: 8,
@@ -542,7 +546,7 @@ class PLYLoader {
             const vertexCount : number = vertexCounts[i];
             const start : number = extentsLut[i][0];
             const end : number  = extentsLut[i][1]; 
-            console.log(`${vertexCount} Vertices.`)
+            // console.log(`${vertexCount} Vertices.`)
             totalVertexCount += vertexCount;
 
             let rowOffset = 0;
@@ -570,11 +574,11 @@ class PLYLoader {
 
             dataByteSizeRead += vertexCount*rowOffset;
         }
-        console.log("PROPERTIES ")
-        console.log(properties);
+        // console.log("PROPERTIES ")
+        // console.log(properties);
 
-        console.log("PROPERTIES INDICES: ");
-        console.log(propIndex);
+        // console.log("PROPERTIES INDICES: ");
+        // console.log(propIndex);
 
         // fill codebooks
         //cb contains each codebooks as int16Array(256)
@@ -587,31 +591,33 @@ class PLYLoader {
             .filter((k) => k.startsWith("property "))) {
                         
             const [_p, type, name] = prop.split(" ");
-            cb.push({name, data: new Int16Array(256)});
+            cb.push({name, data: new Float32Array(256)});
             cbIndex[name] = ind;
             ind ++;
         }
 
         // console.log(cb);
 
-        console.log("CB INDEX OBJECT: ");
-        console.log(cbIndex);
+        // console.log("CB INDEX OBJECT: ");
+        // console.log(cbIndex);
 
                     
-        console.log(dataByteSizeRead + " bytes before codebooks.");
+        // console.log(dataByteSizeRead + " bytes before codebooks.");
         const nbCodeBooks = cb.length;
         const cbDataView = new DataView(inputBuffer, dataByteSizeRead + header_end_index + header_end.length, nbCodeBooks * 2 * 256);
 
-        for(let i = 0; i < 256; i ++) {
-           for(let j = 0; j < nbCodeBooks; j ++) {
-                cb[j].data[i] = cbDataView.getInt16((i*nbCodeBooks*2) + (j*2), true);
-                // cb[j].data[i] = decodeFloat16(cbDataView.getInt16((i*nbCodeBooks*2) + (j*2), true));
+        for(let j = 0; j < nbCodeBooks; j ++) {
+            for(let i = 0; i < 256; i ++) {     
+                const encoded  = cbDataView.getInt16((i*nbCodeBooks*2) + (j*2), true);
+                cb[j].data[i] = decodeFloat16(new Int16Array([encoded]), 0, 1)[0];
+
+                // cb[j].data[i] = cbDataView.getInt16((i*nbCodeBooks*2) + (j*2), true);
 
             }
         }
 
-        console.log("CODEBOOKS: ");
-        console.log(cb);
+        // console.log("CODEBOOKS: ");
+        // console.log(cb);
 
         const shRowLength = 4 * ((1*3) + (15*3)); //diffuse + 3 degrees of spherical harmonics in bytes
         const valDataView = new DataView(inputBuffer, header_end_index + header_end.length, dataByteSizeRead);
@@ -619,6 +625,10 @@ class PLYLoader {
         const shsBuffer = new ArrayBuffer(shRowLength * (vertexCounts[1] + vertexCounts[2] + vertexCounts[3]));
 
         console.log(`sh texture of size ${vertexCounts[3]} * ${shRowLength}`);
+
+
+        let after = performance.now();
+        console.log(`setting codebook, preparing for fetching data took ${after - before}ms.`);
 
         //main loop
         let shLength = 0;
@@ -629,6 +639,9 @@ class PLYLoader {
         const shStrideLut = [3, 8, 15];
         let shStride = 0;
         for(let i = 0; i < 4; i ++) {
+            before = performance.now();
+
+
             const vertexCount : number  = vertexCounts[i];
             const prop : PlyProperty[] = properties[i];
             // const rowOffsetWrite = rowOffsetsWrite[i];
@@ -674,8 +687,8 @@ class PLYLoader {
                     index = valDataView.getUint8(readOffset + pScale.offset + v * rowOffsetRead);
                     indexInCb = cbIndex["scaling"];
                     h = cb[indexInCb].data[index];
-                    value = decodeFloat16(new Int16Array([h]), 0, 1)[0];
-                    scale[j] = Math.exp(value);
+                    // value = decodeFloat16(new Int16Array([h]), 0, 1)[0];
+                    scale[j] = Math.exp(h);
                 }
 
                 //ROTATION
@@ -683,14 +696,16 @@ class PLYLoader {
                 index = valDataView.getUint8(readOffset + pRotRe.offset + v * rowOffsetRead);
                 indexInCb = cbIndex["rotation_re"];
                 h = cb[indexInCb].data[index];
-                r[0] = decodeFloat16(new Int16Array([h]), 0, 1)[0];
+                // r[0] = decodeFloat16(new Int16Array([h]), 0, 1)[0];
+                r[0] = h;
 
                 for(let j = 1; j < 4; j ++) {
                     const pRot = prop[pIndices[`rot_${j}`]];
                     index = valDataView.getUint8(readOffset + pRot.offset + v * rowOffsetRead);
                     indexInCb = cbIndex["rotation_im"];
                     h = cb[indexInCb].data[index];
-                    r[j] = decodeFloat16(new Int16Array([h]), 0, 1)[0];
+                    // r[j] = decodeFloat16(new Int16Array([h]), 0, 1)[0];
+                    r[j] = h;
                 }
 
                 // DIFFUSE COMPONENT (RGBA + FILL SH COEFFS IF LAST POINTCLOUD)
@@ -699,18 +714,18 @@ class PLYLoader {
                     index = valDataView.getUint8(readOffset + pCol.offset + v * rowOffsetRead);
                     indexInCb = cbIndex["features_dc"];
                     h = cb[indexInCb].data[index];
-                    value = decodeFloat16(new Int16Array([h]), 0, 1)[0];
-                    rgba[j] = (0.5 + this.SH_C0* value) * 255;
+                    // value = decodeFloat16(new Int16Array([h]), 0, 1)[0];
+                    rgba[j] = (0.5 + this.SH_C0* h) * 255;
                     
-                    if(i > 0) sh[j] = value;
+                    if(i > 0) sh[j] = h;
                 }
 
                 const pOpacity =  prop[pIndices["opacity"]];
                 index = valDataView.getUint8(readOffset + pOpacity.offset + v * rowOffsetRead);
                 indexInCb = cbIndex["opacity"];
                 h = cb[indexInCb].data[index];
-                value = decodeFloat16(new Int16Array([h]), 0, 1)[0];
-                rgba[3] = (1 / (1 + Math.exp(-value))) * 255;
+                // value = decodeFloat16(new Int16Array([h]), 0, 1)[0];
+                rgba[3] = (1 / (1 + Math.exp(-h))) * 255;
 
                 //SPHERICAL HARMONICS
                 for(const p of sh_prop) {
@@ -723,11 +738,11 @@ class PLYLoader {
                     h = cb[indexInCb].data[index];
 
                     const shIndex =  3 + ((n44 % shStride)*3 + Math.floor(n44 / shStride));
-                    value = decodeFloat16(new Int16Array([h]), 0, 1)[0];
+                    // value = decodeFloat16(new Int16Array([h]), 0, 1)[0];
 
                     // if(v == 0) testArr[3+n44] = coeff;
                     // console.log(``)
-                    sh[shIndex] = value;
+                    sh[shIndex] = h;
                 }
 
 
@@ -744,6 +759,10 @@ class PLYLoader {
                     // console.log(`vertex ${v} rotation ${rot}`);
                     // console.log(`vertex ${v} opacity ${rgba[3]}`);
                 }
+
+            after = performance.now();
+            console.log(`parsing ${vertexCount} vertices took ${after - before}ms.`);
+
                 
             writeOffset += vertexCount * Scene.RowLength;
             readOffset += vertexCount * rowOffsetRead;

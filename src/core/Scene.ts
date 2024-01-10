@@ -61,7 +61,7 @@ class Scene extends EventDispatcher {
             }
             this._vertexCount = data.length / Scene.RowLength;
             
-            console.log("VERTEX COUNT (for data storage in tex ): " + this._vertexCount);
+            // console.log("VERTEX COUNT (for data storage in tex ): " + this._vertexCount);
             // const g3bands = this.vertexCount - (this.bandsIndices[0]+1);
             const shSize = this.vertexCount - (this.bandsIndices[0]+1);
             
@@ -72,7 +72,7 @@ class Scene extends EventDispatcher {
             //     shSize = this.vertexCount;
             // }
             
-            console.log(`${shSize} gaussians with 1,2 or 3 bands.`);
+            // console.log(`${shSize} gaussians with 1,2 or 3 bands.`);
 
             this._height = Math.ceil((2 * this._vertexCount) / this._width);
             this._data = new Uint32Array(this._width * this._height * 4);
