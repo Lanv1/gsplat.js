@@ -62,10 +62,12 @@ class PLYLoader {
             onProgress?.(bytesRead / contentLength);
         }
 
-        onProgress?.(bytesRead / contentLength, true);
         
         const loadTime = performance.now() - this.timestamp;
         console.log(`File loaded in ${loadTime}ms.`);
+        
+        onProgress?.(1, true);
+        await new Promise(resolve => setTimeout(resolve, 20));   //sketchy but only way i found to let html update between loading and parsing
 
         if (plyData[0] !== 112 || plyData[1] !== 108 || plyData[2] !== 121 || plyData[3] !== 10) {
             throw new Error("Invalid PLY file");

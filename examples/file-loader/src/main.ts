@@ -64,6 +64,26 @@ async function loadFile(file: File) {
     loading = false;
 }
 
+async function loadFileUrl(url: string) {
+    if (loading) return;
+    loading = true;
+    // Check if .splat file
+
+    (loadingElem as HTMLElement).style.opacity = "1";
+    (canvasElem as HTMLElement).style.opacity = "0.1";
+    const format = "";
+    // const format = "polycam"; // Uncomment to load a Polycam PLY file
+    await SPLAT.PLYLoader.LoadAsync(
+        url,
+        scene,
+        updateProgress,
+        format,
+        useShs,
+        false    // flag to use quantized parser or not
+    ).then(endProgress);
+        
+}
+
 function updateProgress(progress : number, loadingDone: boolean = false) : void {
 
     barProgress = progress;
@@ -78,6 +98,7 @@ function endProgress() : void {
     (loadingElem as HTMLElement).style.opacity = "0";
     (canvasElem as HTMLElement).style.opacity = "1";
     barDesc = "Loading";
+    loading = false;
 }
 
 
@@ -126,6 +147,10 @@ document.addEventListener("drop", (e) => {
 
 
 async function main() {
+
+        // Load a placeholder scene
+    const url = "https://huggingface.co/datasets/dylanebert/3dgs/resolve/main/bonsai/point_cloud/iteration_7000/point_cloud.ply";
+    loadFileUrl(url);
 
     // Render loop
     const frame = () => {
