@@ -5,6 +5,10 @@ const scene = new SPLAT.Scene();
 let camera = new SPLAT.Camera();
 let controls = new SPLAT.OrbitControls(camera, renderer.domElement);
 
+let canvasElem = document.querySelector("canvas");
+let progressElem = document.getElementById("progress_bar");
+let loadingElem = document.getElementById("loading_bar");
+let loadingDesc = document.getElementById("loading_desc");
 // const camFileElem = document.getElementById("input_cam");
 // const exportBtnElem = document.getElementById("exportBtn");
 // const screenshotBtnElem = document.getElementById("screenshot");
@@ -15,6 +19,67 @@ let loading = false;
 let selectedCam = 0;
 let cameras : any;
 let captureFrame = false;
+
+let barDesc = 'Loading'
+let barProgress = 0
+
+let useShs = true;
+let parseElemCreated = false;
+
+function updateBar() {
+    (loadingDesc as HTMLElement).textContent = `${barDesc} ${barProgress.toFixed(2)}`;
+    if(barDesc == "Parsing" && !parseElemCreated) {
+        (progressElem as HTMLElement).style.opacity = "0.";
+        parseElemCreated = true;
+        const parse_elem = document.createElement('i');
+        parse_elem.classList.add("fa-solid");
+        parse_elem.classList.add("fa-spinner");
+        parse_elem.style.transform = "rotate(0)" ;
+        parse_elem.style.transition= "all 1.5s";
+        loadingElem?.appendChild(parse_elem);
+    } else {
+
+        (progressElem as HTMLProgressElement).value = 100 * barProgress;
+    }
+}
+
+async function loadFile(file: File) {
+    if (loading) return;
+    loading = true;
+    // Check if .splat file
+
+    (loadingElem as HTMLElement).style.opacity = "1";
+    (canvasElem as HTMLElement).style.opacity = "0.1";
+    const format = "";
+    // const format = "polycam"; // Uncomment to load a Polycam PLY file
+    await SPLAT.PLYLoader.LoadFromFileAsync(
+        file,
+        scene,
+        updateProgress,
+        format,
+        useShs,
+        false    // flag to use quantized parser or not
+    ).then(endProgress);
+        
+    loading = false;
+}
+
+function updateProgress(progress : number, loadingDone: boolean = false) : void {
+
+    barProgress = progress;
+    if(loadingDone) {
+        barDesc = "Parsing";
+
+    }
+
+}
+
+function endProgress() : void {
+    (loadingElem as HTMLElement).style.opacity = "0";
+    (canvasElem as HTMLElement).style.opacity = "1";
+    barDesc = "Loading";
+}
+
 
 function downloadCanvasAsImage(event: Event)
 {
@@ -47,82 +112,28 @@ async function selectFile(file: File) {
     loading = false;
 }
 
+// Listen for file drops
+document.addEventListener("drop", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (e.dataTransfer != null) {
+
+        loadFile(e.dataTransfer.files[0])
+        // selectFile(e.dataTransfer.files[0]);
+    }
+});
+
+
 async function main() {
-    // Load a placeholder scene
-    // const url = "https://huggingface.co/datasets/dylanebert/3dgs/resolve/main/bicycle/point_cloud/iteration_30000/point_cloud.ply";
-    // const url = "https://repo-sam.inria.fr/fungraph/reduced_3dgs/bicycle/quantized_bicycle.ply";
-    // const url = "https://huggingface.co/datasets/dylanebert/3dgs/resolve/main/counter/point_cloud/iteration_7000/point_cloud.ply";
-    // await SPLAT.PLYLoader.LoadAsync(url, scene, () => {}, "", true);
-
-    // camFileElem?.addEventListener("change", (event : Event) => {
-    //     const input = event.target as HTMLInputElement;
-    //     if(input.files && input.files.length) {
-    //         const file = input.files[0];
-    //         const reader = new FileReader();
-    //         reader.onload = (e) => {
-    //             cameras = JSON.parse(e.target!.result as string);
-    //             // camera.setFromData(cameras[selectedCam]);
-
-    //             camera = SPLAT.Camera.fromData(cameras[selectedCam]);
-    //             controls.setCamera(camera);
-    //             // controls = new SPLAT.OrbitControls(camera, renderer.domElement);
-    //             // controls.setCameraTarget(camera.position);
-    //         };
-    //         reader.onprogress = (e) => {
-    //         };
-    //         reader.readAsText(file);
-    //         new Promise<void>((resolve) => {
-    //             reader.onloadend = () => {
-    //                 resolve();
-    //             };
-    //         });
-            
-    //         (camSelectorLabelElem as HTMLInputElement).value = "0";
-    //     }
-    // });
-
-    // exportBtnElem?.addEventListener("click", (event: Event) => {
-    //     console.log("export clicked");
-    //     camera.dumpSettings(renderer.domElement.width, renderer.domElement.height);
-    // });
-    
-    // camSelectorBtnElem?.addEventListener("click", (event: Event) => {
-    //     console.log("next cam clicked");
-    //     const nbCam = cameras.length;
-    //     selectedCam = (selectedCam + 1) % nbCam;
-        
-    //     // camera.setFromData(cameras[selectedCam]);
-    //     camera = SPLAT.Camera.fromData(cameras[selectedCam]);
-    //     controls.setCamera(camera);
-
-        
-    //     (camSelectorLabelElem as HTMLInputElement).value = selectedCam.toString();
-    // });
-    
-    // camSelectorLabelElem?.addEventListener("input", (event: Event) => {
-    //     const val : number = parseInt((event.target  as HTMLInputElement).value);
-        
-    //     if (val < cameras.length) {
-    //         selectedCam = val;
-    //         camera = SPLAT.Camera.fromData(cameras[selectedCam]);
-    //         controls.setCamera(camera);        
-    //     }
-    // });
-
-    // screenshotBtnElem?.addEventListener("click", (ev: Event) => { 
-    //     renderer.render(scene, camera);
-    //     renderer.domElement.toBlob((blob : any) =>  window.open(URL.createObjectURL(blob), '_blank'));
-
-    //     // const dataURL = renderer.domElement.toDataURL("image/png");
-    //     // let newTab = window.open('about:blank','image from canvas');
-    //     // newTab?.document.write("<img src='" + dataURL + "' alt='from canvas'/>");        
-    // });
 
     // Render loop
     const frame = () => {
         controls.update();
         renderer.render(scene, camera);
 
+        if(loading)
+            updateBar();
         // if(captureFrame) {
         //     captureFrame = false;
         //     const dataURL = renderer.domElement.toDataURL("image/png", 1.0);
@@ -135,15 +146,7 @@ async function main() {
 
     requestAnimationFrame(frame);
 
-    // Listen for file drops
-    document.addEventListener("drop", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
 
-        if (e.dataTransfer != null) {
-            selectFile(e.dataTransfer.files[0]);
-        }
-    });
 }
 
 main();

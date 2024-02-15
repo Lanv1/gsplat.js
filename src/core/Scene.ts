@@ -125,7 +125,6 @@ class Scene extends EventDispatcher {
 
             for (let i = 0; i < this._vertexCount; i++) {
                 
-
                 this._positions[3 * i + 0] = f_buffer[8 * i + 0];
                 this._positions[3 * i + 1] = f_buffer[8 * i + 1];
                 this._positions[3 * i + 2] = f_buffer[8 * i + 2];
@@ -467,6 +466,47 @@ class Scene extends EventDispatcher {
     set bandsIndices(bIndices: Int32Array) {
         this._bandsIndices = bIndices;
     }
+
+    set height(h : number) {
+        this._height = h;
+    };
+
+    set data(d : Uint32Array) {
+        this._data = d;
+    }
+
+    set vertexCount(vc : number) {
+        this._vertexCount = vc;
+    }
+
+    set width(w : number) {
+        this._width = w;
+    }
+
+    set positions(farr : Float32Array) {
+        this._positions = farr;
+    }
+
+    set rotations(farr : Float32Array) {
+        this._rotations = farr;
+    }
+
+    set scales(farr : Float32Array) {
+        this._scales = farr;
+    }
+
+    set shs(uarr : Uint32Array) {
+        this._shs = uarr;
+    }
+
+    set shs_rgb(uarrs : [Uint32Array, Uint32Array, Uint32Array]) {
+        this._shs_rgb = uarrs;
+    }
+
+    set shHeight(h : number) {
+        this._shHeight = h;
+    }
+
 }
 
 export { Scene };

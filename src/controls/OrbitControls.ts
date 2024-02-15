@@ -12,6 +12,7 @@ class OrbitControls {
     panSpeed: number = 1;
     zoomSpeed: number = 1;
     dampening: number = 0.12;
+    
     setCameraTarget: (newTarget: Vector3) => void = () => {};
     attach: (newCamera: Camera) => void = () => {};
     detach: () => void = () => {};

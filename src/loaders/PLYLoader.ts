@@ -1,12 +1,31 @@
 import { Scene } from "../core/Scene";
-import { Vector3 } from "../math/Vector3";
+import { Matrix3 } from "../math/Matrix3";
 import { Quaternion } from "../math/Quaternion";
+import { Vector3 } from "../math/Vector3";
 import { int16ToFloat32 } from "../utils";
 import { decodeFloat16 } from "../utils";
+import { resolve } from "path";
+import { rejects } from "assert";
+import { packHalf2x16 } from "../utils";
+import { EventDispatcher } from "../core/EventDispatcher";
 
+
+type PlyProperty = {
+    name: string;
+    type: string;
+    offset: number;
+};
+
+type PlyHeader = {
+    properties: PlyProperty[],
+    size: number,
+    vertexCount: number
+};
+
+const  SH_C0 = 0.28209479177387814;
 class PLYLoader {
-    static SH_C0 = 0.28209479177387814;
     static timestamp = 0;
+    static changeEvent = { type: "change" } as Event;
 
     static async LoadAsync(
         url: string,
@@ -85,77 +104,291 @@ class PLYLoader {
 
     }
 
+    // Only the loading of the file as a promise
+    private static async loadFileDataAsync(
+        file: File,
+        onProgress?: (progress: number, loadingDone?: boolean) => void,
+    ): Promise<ArrayBuffer> {
+
+        const reader = new FileReader();
+        reader.onloadstart = (e) => {
+            PLYLoader.timestamp = performance.now();
+        }
+
+        reader.onprogress = (e) => {
+            onProgress?.(e.loaded / e.total, false);
+        };
+        
+        reader.readAsArrayBuffer(file);
+        const dataPromise = await new Promise<ArrayBuffer>((resolve) => {
+            reader.onload = (e) => {
+
+                const loadTime = performance.now() - PLYLoader.timestamp;
+                console.log(`File loaded in ${loadTime}ms.`);
+                onProgress?.(1, true);
+                
+                resolve(e.target!.result as ArrayBuffer);
+            };
+        });
+
+        onProgress?.(1, true);
+        await new Promise(resolve => setTimeout(resolve, 20));   //sketchy but only way i found to let html update between loading and parsing
+
+        return dataPromise;
+    }
+
+    // Directly set data in the texture while parsing the file (no intermediate array construction) hopefully faster than before -> actually not faster 
+    private static _ParsePLYAndFillData(scene: Scene,  header: PlyHeader, inputBuffer: ArrayBuffer, format: string): void {
+
+        const shRowLength = 4 * ((1*3) + (15*3)); //diffuse + 3 degrees of spherical harmonics in bytes
+
+        const dataView = new DataView(inputBuffer, header.size);
+        const input = new Float32Array(inputBuffer, header.size);
+        const dataBuffer = new ArrayBuffer(Scene.RowLength * header.vertexCount);
+        const shsBuffer = new ArrayBuffer(shRowLength * header.vertexCount);
+
+        const shSize = header.vertexCount;
+            
+        // let shSize;
+        // if(this.bandsIndices[0] > 0) {
+        //     shSize = this.vertexCount - (this.bandsIndices[0]+1);
+        // } else {
+        //     shSize = this.vertexCount;
+        // }
+        
+
+
+        // Convert properties as a dictionnary -> faster
+        const prop: Record<string, PlyProperty> = header.properties.reduce((acc: Record<string, PlyProperty>, item: PlyProperty) => {
+            acc[item.name] = item;
+            return acc;
+        }, {});
+        
+        // console.log(prop);
+
+        // const rowOffset = header.properties.reduce((accumulator, currentValue) => { return accumulator + currentValue.offset}, 0);
+        const rowOffset = header.properties[header.properties.length-1].offset +4
+        console.log("ROW OFFSET " + rowOffset)
+
+        let r0: number = 255;
+        let r1: number = 0;
+        let r2: number = 0;
+        let r3: number = 0; 
+        let q : Quaternion;
+
+
+        // SCENE DATA (Texture data)
+        // console.log(`${shSize} gaussians with 1,2 or 3 bands.`);
+        scene.vertexCount = header.vertexCount;
+        scene.height = Math.ceil((2 * scene.vertexCount) / scene.width);
+        scene.data = new Uint32Array(scene.width * scene.height * 4);
+        scene.positions = new Float32Array(3 * scene.vertexCount);
+        scene.rotations = new Float32Array(4 * scene.vertexCount);
+        scene.scales = new Float32Array(3 * scene.vertexCount);
+
+        // if(typeof shs != 'undefined') {
+        scene.shHeight = Math.ceil((2 * shSize) / scene.width);
+            //padding added
+            // this._shs = new Uint32Array(this._width* this._shHeight * 4);
+
+            // no pad needed: 16F32 -> 8F32 using half16 packing so each sh texture is the same size as data texture !
+        scene.shs_rgb = [
+            new Uint32Array(scene.width * scene.shHeight * 4),
+            new Uint32Array(scene.width * scene.shHeight * 4),
+            new Uint32Array(scene.width * scene.shHeight * 4)
+        ];
+        // }
+
+        const f_buffer = new Float32Array(inputBuffer, header.size);
+        const u_buffer = new Uint8Array(inputBuffer, header.size);
+
+        const data_c = new Uint8Array(scene.data.buffer);
+        const data_f = new Float32Array(scene.data.buffer);
+        
+        const shs_f = new Float32Array(scene.shs.buffer);
+
+        for (let i = 0; i < header.vertexCount; i++) {
+            // const position = new Float32Array(dataBuffer, i * Scene.RowLength, 3);
+            // const scale = new Float32Array(dataBuffer, i * Scene.RowLength + 12, 3);
+            const rgba = new Uint8ClampedArray(dataBuffer, i * Scene.RowLength + 24, 4);
+            // const rot = new Uint8ClampedArray(dataBuffer, i * Scene.RowLength + 28, 4);
+            // const sh = new Float32Array(shsBuffer, i*shRowLength, 48);
+            const floatOffset = i * (rowOffset / 4);
+
+            // position.set([
+            //     input[(prop['x'].offset / 4) + floatOffset],
+            //     input[(prop['y'].offset / 4) + floatOffset],
+            //     input[(prop['z'].offset / 4) + floatOffset]
+            // ], 0);
+
+            //SCENE POSITIONS
+            data_f[8 * i + 0] = f_buffer[(prop['x'].offset / 4) + floatOffset];
+            data_f[8 * i + 1] = f_buffer[(prop['y'].offset / 4) + floatOffset];
+            data_f[8 * i + 2] = f_buffer[(prop['z'].offset / 4) + floatOffset];
+            
+            scene.positions[3 * i + 0] = data_f[8 * i + 0];
+            scene.positions[3 * i + 1] = data_f[8 * i + 1];
+            scene.positions[3 * i + 2] = data_f[8 * i + 2];
+
+
+            //SCENE SCALES
+            scene.scales[3 * i + 0] = Math.exp( input[(prop['scale_0'].offset / 4) + floatOffset]);
+            scene.scales[3 * i + 1] = Math.exp( input[(prop['scale_1'].offset / 4) + floatOffset]);
+            scene.scales[3 * i + 2] = Math.exp( input[(prop['scale_2'].offset / 4) + floatOffset]);
+
+            //SCENE RGBA
+            data_c[4 * (8 * i + 7) + 0] = (0.5 + SH_C0 *  input[(prop['f_dc_0'].offset / 4) + floatOffset] * 255);
+            data_c[4 * (8 * i + 7) + 1] = (0.5 + SH_C0 *  input[(prop['f_dc_1'].offset / 4) + floatOffset] * 255);
+            data_c[4 * (8 * i + 7) + 2] = (0.5 + SH_C0 *  input[(prop['f_dc_2'].offset / 4) + floatOffset] * 255);
+            data_c[4 * (8 * i + 7) + 3] = (0.5 + SH_C0 *  input[(prop['opacity'].offset / 4) + floatOffset] * 255);
+
+            // rgba.set([
+            //     (0.5 + SH_C0 *  input[(prop['f_dc_0'].offset / 4) + floatOffset] * 255),
+            //     (0.5 + SH_C0 *  input[(prop['f_dc_1'].offset / 4) + floatOffset] * 255),
+            //     (0.5 + SH_C0 *  input[(prop['f_dc_2'].offset / 4) + floatOffset] * 255),
+            //     (1 / (1 + Math.exp(-input[(prop['opacity'].offset / 4) + floatOffset])) * 255)
+            // ], 0);
+
+            r0 =  input[(prop['rot_0'].offset/4) + floatOffset];
+            r1 =  input[(prop['rot_1'].offset/4) + floatOffset];
+            r2 =  input[(prop['rot_2'].offset/4) + floatOffset];
+            r3 =  input[(prop['rot_3'].offset/4) + floatOffset];
+
+            q = new Quaternion(r1, r2, r3, r0);
+
+            q = q.normalize();
+
+            scene.rotations[4 * i + 0] = q.w;
+            scene.rotations[4 * i + 1] = q.x;
+            scene.rotations[4 * i + 2] = q.y;
+            scene.rotations[4 * i + 3] = q.z;
+
+            const rot = Matrix3.RotationFromQuaternion(
+                new Quaternion(
+                    scene.rotations[4 * i + 1],
+                    scene.rotations[4 * i + 2],
+                    scene.rotations[4 * i + 3],
+                    -scene.rotations[4 * i + 0],
+                ),
+            );
+
+            const scale = Matrix3.Diagonal(
+                new Vector3(scene.scales[3 * i + 0], scene.scales[3 * i + 1], scene.scales[3 * i + 2]),
+            );
+
+            const M = scale.multiply(rot).buffer;
+
+            const sigma = [
+                M[0] * M[0] + M[3] * M[3] + M[6] * M[6],
+                M[0] * M[1] + M[3] * M[4] + M[6] * M[7],
+                M[0] * M[2] + M[3] * M[5] + M[6] * M[8],
+                M[1] * M[1] + M[4] * M[4] + M[7] * M[7],
+                M[1] * M[2] + M[4] * M[5] + M[7] * M[8],
+                M[2] * M[2] + M[5] * M[5] + M[8] * M[8],
+            ];
+
+            // SCENE ROTATION (COV MATRIX)
+            scene.data[8 * i + 4] = packHalf2x16(4 * sigma[0], 4 * sigma[1]);
+            scene.data[8 * i + 5] = packHalf2x16(4 * sigma[2], 4 * sigma[3]);
+            scene.data[8 * i + 6] = packHalf2x16(4 * sigma[4], 4 * sigma[5]);
+
+            //Scene SHS:
+                // BETTER: pack them in 3 textures (one per component)       
+             
+            scene.shs_rgb[0][8*i] = packHalf2x16(
+                input[(prop[`f_dc_0`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_0`].offset / 4) + floatOffset]
+            );
+
+            scene.shs_rgb[1][8*i] = packHalf2x16(
+                input[(prop[`f_dc_1`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_15`].offset / 4) + floatOffset]
+            );
+
+            scene.shs_rgb[2][8*i] = packHalf2x16(
+                input[(prop[`f_dc_2`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_30`].offset / 4) + floatOffset]
+            );
+
+            let ind = 1;
+            for(let j = 1; j < 8; j ++) {
+                scene.shs_rgb[0][8*i + j] = packHalf2x16(
+                    input[(prop[`f_rest_${ind}`].offset / 4) + floatOffset],
+                    input[(prop[`f_rest_${ind + 1}`].offset / 4) + floatOffset]
+                );
+
+                scene.shs_rgb[1][8*i + j] = packHalf2x16(
+                    input[(prop[`f_rest_${ind + 15}`].offset / 4) + floatOffset],
+                    input[(prop[`f_rest_${ind + 16}`].offset / 4) + floatOffset]
+                );
+
+                scene.shs_rgb[2][8*i + j] = packHalf2x16(
+                    input[(prop[`f_rest_${ind + 30}`].offset / 4) + floatOffset],
+                    input[(prop[`f_rest_${ind + 31}`].offset / 4) + floatOffset]
+                );
+                ind +=2;
+            }
+
+        }
+
+        scene.dispatchEvent(PLYLoader.changeEvent);
+    }
+
     static async LoadFromFileAsync(
         file: File,
         scene: Scene,
-        onProgress?: (progress: number) => void,
+        onProgress?: (progress: number, loadingDone?: boolean) => void,
         format: string = "",
         useShs: boolean = false,
         quantized: boolean = false
     ): Promise<void> {
-        const reader = new FileReader();
-        reader.onload = (e) => {
+
+        await PLYLoader.loadFileDataAsync(file, onProgress)
+        .then((rawBuffer: ArrayBuffer) => {
             if(useShs) {
-                const loadTime = performance.now() - this.timestamp;
-                console.log(`File loaded in ${loadTime}ms.`);
+                // const rawData = this._ParseFullPLYBuffer(plyData.buffer, format);
                 let before = performance.now();
 
                 let rawData;
                 if(quantized) {
-                    rawData = this._ParseQPLYBuffer(e.target!.result as ArrayBuffer, format);    
-
+                    rawData = this._ParseQPLYBuffer(rawBuffer, format);    
                     scene.bandsIndices = rawData[2]; //Indices of last gaussians having 0, 1 or 2 bands activated
                     // scene.g0bands= rawData[2]; //Nb of vertices having 0 bands.
                 } else {
-                    rawData = this._ParseFullPLYBuffer(e.target!.result as ArrayBuffer, format);
+                    const plyHeader = this._parsePLYHeader(rawBuffer, format);
+
+                    console.log("PLY HEADER parsed: ");
+                    console.log(plyHeader);
+
+                    rawData = this._ParseFullPLYBufferFast(plyHeader, rawBuffer);
                 }
-                
                 let after = performance.now();
+    
+                console.log("PLY file parsing took " + (after - before) + " ms.");
+    
                 const data = new Uint8Array(rawData[0]);
-                // const data = new Uint8Array(this._ParsePLYBuffer(e.target!.result as ArrayBuffer, format));
                 const shData = new Float32Array(rawData[1]);
-
-                console.log("PLY file parsing loading took " + (after - before) + " ms.");
-                // console.log(data);
-
-                before = performance.now();            
-                // scene.setData(data);
+                
+                before = performance.now();
                 scene.setData(data, shData);
                 after = performance.now();
-
+    
                 console.log("setting the data in textures took " + (after - before) + " ms.");
             } else {
-                let before = performance.now();
-                const data = new Uint8Array(this._ParsePLYBuffer(e.target!.result as ArrayBuffer, format));
-                let after = performance.now();
-
-                console.log("PLY file loading took " + (after - before) + " ms. (no shs)");
-
+                const data = new Uint8Array(this._ParsePLYBuffer(rawBuffer, format));
                 scene.setData(data);
             }
-        };
-
-        reader.onloadstart = (e) => {
-            this.timestamp = performance.now();
-        }
-
-        reader.onprogress = (e) => {
-            onProgress?.(e.loaded / e.total);
-        };
-        reader.readAsArrayBuffer(file);
-        await new Promise<void>((resolve) => {
-            reader.onloadend = () => {
-                resolve();
-            };
         });
+
+      
     }
 
     private static _ParsePLYBuffer(inputBuffer: ArrayBuffer, format: string): ArrayBuffer {
-        type PlyProperty = {
-            name: string;
-            type: string;
-            offset: number;
-        };
+        // type PlyProperty = {
+        //     name: string;
+        //     type: string;
+        //     offset: number;
+        // };
 
         const ubuf = new Uint8Array(inputBuffer);
         const headerText = new TextDecoder().decode(ubuf.slice(0, 1024 * 10));
@@ -246,16 +479,16 @@ class PLYLoader {
                         rgba[2] = value;
                         break;
                     case "f_dc_0":
-                        rgba[0] = (0.5 + this.SH_C0 * value) * 255;
+                        rgba[0] = (0.5 + SH_C0 * value) * 255;
                         break;
                     case "f_dc_1":
-                        rgba[1] = (0.5 + this.SH_C0 * value) * 255;
+                        rgba[1] = (0.5 + SH_C0 * value) * 255;
                         break;
                     case "f_dc_2":
-                        rgba[2] = (0.5 + this.SH_C0 * value) * 255;
+                        rgba[2] = (0.5 + SH_C0 * value) * 255;
                         break;
                     case "f_dc_3":
-                        rgba[3] = (0.5 + this.SH_C0 * value) * 255;
+                        rgba[3] = (0.5 + SH_C0 * value) * 255;
                         break;
                     case "opacity":
                         rgba[3] = (1 / (1 + Math.exp(-value))) * 255;
@@ -301,16 +534,185 @@ class PLYLoader {
         return buffer;
     }
 
-    //Must parse all 48 shs
-    private static _ParseFullPLYBuffer(inputBuffer: ArrayBuffer, format: string): [ArrayBuffer, ArrayBuffer] {
-        type PlyProperty = {
-            name: string;
-            type: string;
-            offset: number;
+    // Reads properties and size of header + vertexCount only
+    private static _parsePLYHeader(inputBuffer: ArrayBuffer, format: string): PlyHeader {
+        const ubuf = new Uint8Array(inputBuffer);
+        const headerText = new TextDecoder().decode(ubuf.slice(0, 1024 * 10));
+        const header_end = "end_header\n";
+        const header_end_index = headerText.indexOf(header_end);
+        if (header_end_index < 0) throw new Error("Unable to read .ply file header");
+
+        const vertexCount = parseInt(/element vertex (\d+)\n/.exec(headerText)![1]);
+
+        let rowOffset = 0;
+        const offsets: Record<string, number> = {
+            double: 8,
+            int: 4,
+            uint: 4,
+            float: 4,
+            short: 2,
+            ushort: 2,
+            uchar: 1,
         };
 
-        let minSh = new Float32Array(48);
-        let maxSh = new Float32Array(48);
+        const properties: PlyProperty[] = [];
+        for (const prop of headerText
+            .slice(0, header_end_index)
+            .split("\n")
+            .filter((k) => k.startsWith("property "))) {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const [_p, type, name] = prop.split(" ");
+            properties.push({ name, type, offset: rowOffset });
+            if (!offsets[type]) throw new Error(`Unsupported property type: ${type}`);
+            rowOffset += offsets[type];
+        }
+
+        // let plyHeader : PlyHeader = {properties: properties, size: (header_end_index + header_end.length), vertexCount: vertexCount};
+        return {properties: properties, size: (header_end_index + header_end.length), vertexCount: vertexCount};
+    }
+
+
+    private static _ParseFullPLYBufferFast(
+        header:PlyHeader, inputBuffer: ArrayBuffer,
+        onProgress? : (progress: number, loadingDone?: boolean) => void): [ArrayBuffer, ArrayBuffer] {
+
+        const shRowLength = 4 * ((1*3) + (15*3)); //diffuse + 3 degrees of spherical harmonics in bytes
+
+        const input = new Float32Array(inputBuffer, header.size);   // since we're treating everything as a float32 there is no need for a dataview
+        const dataBuffer = new ArrayBuffer(Scene.RowLength * header.vertexCount);
+        const shsBuffer = new ArrayBuffer(shRowLength * header.vertexCount);
+
+        const prop: Record<string, PlyProperty> = header.properties.reduce((acc: Record<string, PlyProperty>, item: PlyProperty) => {
+            acc[item.name] = item;
+            return acc;
+        }, {});
+        
+        // console.log(prop);
+
+        const rowOffset = header.properties[header.properties.length-1].offset +4
+
+        let r0: number = 255;
+        let r1: number = 0;
+        let r2: number = 0;
+        let r3: number = 0; 
+        let q : Quaternion;
+
+
+        for (let i = 0; i < header.vertexCount; i++) {
+            const position = new Float32Array(dataBuffer, i * Scene.RowLength, 3);
+            const scale = new Float32Array(dataBuffer, i * Scene.RowLength + 12, 3);
+            const rgba = new Uint8ClampedArray(dataBuffer, i * Scene.RowLength + 24, 4);
+            const rot = new Uint8ClampedArray(dataBuffer, i * Scene.RowLength + 28, 4);
+            const sh = new Float32Array(shsBuffer, i*shRowLength, 48);
+            const floatOffset = i * (rowOffset / 4);
+
+            position.set([
+                input[(prop['x'].offset / 4) + floatOffset],
+                input[(prop['y'].offset / 4) + floatOffset],
+                input[(prop['z'].offset / 4) + floatOffset]
+            ], 0);
+
+            scale.set([
+                Math.exp( input[(prop['scale_0'].offset / 4) + floatOffset]),
+                Math.exp( input[(prop['scale_1'].offset / 4) + floatOffset]),
+                Math.exp( input[(prop['scale_2'].offset / 4) + floatOffset])
+            ], 0);
+
+            rgba.set([
+                (0.5 + SH_C0 *  input[(prop['f_dc_0'].offset / 4) + floatOffset] * 255),
+                (0.5 + SH_C0 *  input[(prop['f_dc_1'].offset / 4) + floatOffset] * 255),
+                (0.5 + SH_C0 *  input[(prop['f_dc_2'].offset / 4) + floatOffset] * 255),
+                (1 / (1 + Math.exp(-input[(prop['opacity'].offset / 4) + floatOffset])) * 255)
+            ], 0);
+
+            r0 =  input[(prop['rot_0'].offset/4) + floatOffset];
+            r1 =  input[(prop['rot_1'].offset/4) + floatOffset];
+            r2 =  input[(prop['rot_2'].offset/4) + floatOffset];
+            r3 =  input[(prop['rot_3'].offset/4) + floatOffset];
+
+            q = new Quaternion(r1, r2, r3, r0);
+
+            q = q.normalize();
+
+            rot.set([
+                q.w * 128 + 128,
+                q.x * 128 + 128,
+                q.y * 128 + 128,
+                q.z * 128 + 128,
+            ], 0);
+
+            sh.set([
+                input[(prop['f_dc_0'].offset / 4) + floatOffset],
+                input[(prop['f_dc_1'].offset / 4) + floatOffset],
+                input[(prop['f_dc_2'].offset / 4) + floatOffset]
+            ], 0);
+
+            sh.set([
+                input[(prop[`f_rest_0`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_15`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_30`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_1`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_16`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_31`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_2`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_17`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_32`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_3`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_18`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_33`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_4`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_19`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_34`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_5`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_20`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_35`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_6`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_21`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_36`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_7`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_22`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_37`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_8`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_23`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_38`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_9`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_24`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_38`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_10`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_25`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_40`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_11`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_26`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_41`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_12`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_27`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_42`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_13`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_28`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_43`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_14`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_29`].offset / 4) + floatOffset],
+                input[(prop[`f_rest_44`].offset / 4) + floatOffset],
+            ], 3);
+            // for(let j = 0; j < 45; j ++) {
+            //     const index = 3 + ((j % 15)*3 + Math.floor(j / 15));
+            //     sh[index] =  input[(header.properties[propInd[`f_rest_${j}`]].offset / 4) + floatOffset];
+            // }
+        }
+
+        // onProgress?.(1, true);
+
+
+        return [dataBuffer, shsBuffer];
+    }
+
+    //Must parse all 48 shs
+    private static _ParseFullPLYBuffer(inputBuffer: ArrayBuffer, format: string): [ArrayBuffer, ArrayBuffer] {
+        // type PlyProperty = {
+        //     name: string;
+        //     type: string;
+        //     offset: number;
+        // };
 
         let minDc = new Float32Array(3);
         let maxDc = new Float32Array(3);
@@ -353,7 +755,7 @@ class PLYLoader {
         const shsBuffer = new ArrayBuffer(shRowLength * vertexCount);
 
         const q_polycam = Quaternion.FromEuler(new Vector3(Math.PI / 2, 0, 0));
-
+        console.log("ROW OFFSET " + rowOffset)
         for (let i = 0; i < vertexCount; i++) {
             const position = new Float32Array(dataBuffer, i * Scene.RowLength, 3);
             const scale = new Float32Array(dataBuffer, i * Scene.RowLength + 12, 3);
@@ -416,25 +818,25 @@ class PLYLoader {
                             rgba[2] = value;
                             break;
                         case "f_dc_0":
-                            rgba[0] = (0.5 + this.SH_C0 * value) * 255;
+                            rgba[0] = (0.5 + SH_C0 * value) * 255;
                             sh[0] = value;
                             minDc[0] = value < minDc[0] ? value : minDc[0]; 
                             maxDc[0] = value > maxDc[0] ? value : maxDc[0]; 
                             break;
                             case "f_dc_1":
-                            rgba[1] = (0.5 + this.SH_C0 * value) * 255;
+                            rgba[1] = (0.5 + SH_C0 * value) * 255;
                             sh[1] = value;
                             minDc[1] = value < minDc[1] ? value : minDc[1];
                             maxDc[1] = value > maxDc[1] ? value : maxDc[1];
                             break;
                             case "f_dc_2":
-                            rgba[2] = (0.5 + this.SH_C0 * value) * 255;
+                            rgba[2] = (0.5 + SH_C0 * value) * 255;
                             sh[2] = value;
                             minDc[2] = value < minDc[2] ? value : minDc[2];
                             maxDc[2] = value > maxDc[2] ? value : maxDc[2];
                             break;
                         case "f_dc_3":
-                            rgba[3] = (0.5 + this.SH_C0 * value) * 255;
+                            rgba[3] = (0.5 + SH_C0 * value) * 255;
                             break;
                         case "opacity":
                             rgba[3] = (1 / (1 + Math.exp(-value))) * 255;
@@ -574,11 +976,6 @@ class PLYLoader {
 
             dataByteSizeRead += vertexCount*rowOffset;
         }
-        // console.log("PROPERTIES ")
-        // console.log(properties);
-
-        // console.log("PROPERTIES INDICES: ");
-        // console.log(propIndex);
 
         // fill codebooks
         //cb contains each codebooks as int16Array(256)
@@ -630,6 +1027,18 @@ class PLYLoader {
         let after = performance.now();
         console.log(`setting codebook, preparing for fetching data took ${after - before}ms.`);
 
+
+        const props = []
+        for(let i = 0; i < 4; i ++) {
+            const prop: Record<string, PlyProperty> = properties[i].reduce((acc: Record<string, PlyProperty>, item: PlyProperty) => {
+                acc[item.name] = item;
+                return acc;
+            }, {});
+
+            props.push(prop);
+        }
+
+
         //main loop
         let shLength = 0;
         let writeOffset = 0;
@@ -643,17 +1052,18 @@ class PLYLoader {
 
 
             const vertexCount : number  = vertexCounts[i];
-            const prop : PlyProperty[] = properties[i];
+            // const prop : PlyProperty[] = properties[i];
+
+            const prop = props[i];
             // const rowOffsetWrite = rowOffsetsWrite[i];
             const rowOffsetRead = rowOffsetsRead[i];
-            const pIndices = propIndex[i];
 
             if(i > 0){
                 shLength = shRowLength;
                 shStride = shStrideLut[i-1];
             } 
 
-            const sh_prop = prop.filter((p) => p.name.startsWith("f_rest"));
+            const sh_prop = properties[i].filter((p) => p.name.startsWith("f_rest"));
 
             for(let v = 0; v < vertexCount; v ++) {
                 const position = new Float32Array(dataBuffer, writeOffset + v * Scene.RowLength, 3);
@@ -665,25 +1075,35 @@ class PLYLoader {
                 let r = [255, 0, 0, 0];
                 
                 // POSITION
-                const pX = prop[pIndices['x']];
-                let h = valDataView.getInt16(readOffset + pX.offset + v * rowOffsetRead, true);
-                position[0] = decodeFloat16(new Int16Array([h]), 0, 1)[0];
+                // const pX = prop['x'];
+                // let h = valDataView.getInt16(readOffset + pX.offset + v * rowOffsetRead, true);
+                // position[0] = decodeFloat16(new Int16Array([h]), 0, 1)[0];
                 
-                const pY = prop[pIndices['y']];
-                h = valDataView.getInt16(readOffset + pY.offset + v * rowOffsetRead, true);
-                position[1] = decodeFloat16(new Int16Array([h]), 0, 1)[0];
+                // const pY = prop['y'];
+                // h = valDataView.getInt16(readOffset + pY.offset + v * rowOffsetRead, true);
+                // position[1] = decodeFloat16(new Int16Array([h]), 0, 1)[0];
 
-                const pZ = prop[pIndices['z']];
-                h = valDataView.getInt16(readOffset + pZ.offset + v * rowOffsetRead, true);
-                position[2] = decodeFloat16(new Int16Array([h]), 0, 1)[0];
+                // const pZ = prop['z'];
+                // h = valDataView.getInt16(readOffset + pZ.offset + v * rowOffsetRead, true);
+                // position[2] = decodeFloat16(new Int16Array([h]), 0, 1)[0];
 
-                let index;
-                let indexInCb;
-                let value;
+                position.set([
+                    decodeFloat16(new Int16Array([
+                        valDataView.getInt16(readOffset + prop['x'].offset + v * rowOffsetRead, true)
+                    ]), 0, 1)[0],
+                    decodeFloat16(new Int16Array([
+                        valDataView.getInt16(readOffset + prop['y'].offset + v * rowOffsetRead, true)
+                    ]), 0, 1)[0],
+                    decodeFloat16(new Int16Array([
+                        valDataView.getInt16(readOffset + prop['z'].offset + v * rowOffsetRead, true)
+                    ]), 0, 1)[0],
+                ], 0);
+
+                let index, indexInCb, h;
 
                 // SCALING
                 for(let j = 0; j < 3; j ++) {
-                    const pScale = prop[pIndices[`scale_${j}`]];
+                    const pScale = prop[`scale_${j}`];
                     index = valDataView.getUint8(readOffset + pScale.offset + v * rowOffsetRead);
                     indexInCb = cbIndex["scaling"];
                     h = cb[indexInCb].data[index];
@@ -692,7 +1112,7 @@ class PLYLoader {
                 }
 
                 //ROTATION
-                const pRotRe = prop[pIndices["rot_0"]];
+                const pRotRe = prop["rot_0"];
                 index = valDataView.getUint8(readOffset + pRotRe.offset + v * rowOffsetRead);
                 indexInCb = cbIndex["rotation_re"];
                 h = cb[indexInCb].data[index];
@@ -700,7 +1120,7 @@ class PLYLoader {
                 r[0] = h;
 
                 for(let j = 1; j < 4; j ++) {
-                    const pRot = prop[pIndices[`rot_${j}`]];
+                    const pRot = prop[`rot_${j}`];
                     index = valDataView.getUint8(readOffset + pRot.offset + v * rowOffsetRead);
                     indexInCb = cbIndex["rotation_im"];
                     h = cb[indexInCb].data[index];
@@ -710,17 +1130,17 @@ class PLYLoader {
 
                 // DIFFUSE COMPONENT (RGBA + FILL SH COEFFS IF LAST POINTCLOUD)
                 for(let j = 0; j < 3; j ++) {
-                    const pCol = prop[pIndices[`f_dc_${j}`]];
+                    const pCol = prop[`f_dc_${j}`];
                     index = valDataView.getUint8(readOffset + pCol.offset + v * rowOffsetRead);
                     indexInCb = cbIndex["features_dc"];
                     h = cb[indexInCb].data[index];
                     // value = decodeFloat16(new Int16Array([h]), 0, 1)[0];
-                    rgba[j] = (0.5 + this.SH_C0* h) * 255;
+                    rgba[j] = (0.5 + SH_C0* h) * 255;
                     
                     if(i > 0) sh[j] = h;
                 }
 
-                const pOpacity =  prop[pIndices["opacity"]];
+                const pOpacity =  prop["opacity"];
                 index = valDataView.getUint8(readOffset + pOpacity.offset + v * rowOffsetRead);
                 indexInCb = cbIndex["opacity"];
                 h = cb[indexInCb].data[index];
