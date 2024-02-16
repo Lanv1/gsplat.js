@@ -581,6 +581,8 @@ class PLYLoader {
 
         const shRowLength = 4 * ((1*3) + (15*3)); //diffuse + 3 degrees of spherical harmonics in bytes
 
+        const dataView = new DataView(inputBuffer, header.size);
+
         const input = new Float32Array(inputBuffer, header.size);   // since we're treating everything as a float32 there is no need for a dataview
         const dataBuffer = new ArrayBuffer(Scene.RowLength * header.vertexCount);
         const shsBuffer = new ArrayBuffer(shRowLength * header.vertexCount);
@@ -610,28 +612,28 @@ class PLYLoader {
             const floatOffset = i * (rowOffset / 4);
 
             position.set([
-                input[(prop['x'].offset / 4) + floatOffset],
-                input[(prop['y'].offset / 4) + floatOffset],
-                input[(prop['z'].offset / 4) + floatOffset]
+                dataView.getFloat32(prop['x'].offset + i*rowOffset, true),
+                dataView.getFloat32(prop['y'].offset + i*rowOffset, true),
+                dataView.getFloat32(prop['z'].offset + i*rowOffset, true)
             ], 0);
 
             scale.set([
-                Math.exp( input[(prop['scale_0'].offset / 4) + floatOffset]),
-                Math.exp( input[(prop['scale_1'].offset / 4) + floatOffset]),
-                Math.exp( input[(prop['scale_2'].offset / 4) + floatOffset])
+                Math.exp(dataView.getFloat32(prop['scale_0'].offset + i*rowOffset, true)),
+                Math.exp(dataView.getFloat32(prop['scale_1'].offset + i*rowOffset, true)),
+                Math.exp(dataView.getFloat32(prop['scale_2'].offset + i*rowOffset, true))
             ], 0);
 
             rgba.set([
-                (0.5 + SH_C0 *  input[(prop['f_dc_0'].offset / 4) + floatOffset] * 255),
-                (0.5 + SH_C0 *  input[(prop['f_dc_1'].offset / 4) + floatOffset] * 255),
-                (0.5 + SH_C0 *  input[(prop['f_dc_2'].offset / 4) + floatOffset] * 255),
-                (1 / (1 + Math.exp(-input[(prop['opacity'].offset / 4) + floatOffset])) * 255)
+                (0.5 + SH_C0 *  dataView.getFloat32(prop['f_dc_0'].offset + i*rowOffset, true) * 255),
+                (0.5 + SH_C0 *  dataView.getFloat32(prop['f_dc_1'].offset + i*rowOffset, true) * 255),
+                (0.5 + SH_C0 *  dataView.getFloat32(prop['f_dc_2'].offset + i*rowOffset, true) * 255),
+                (1 / (1 + Math.exp(-dataView.getFloat32(prop['opacity'].offset + i *rowOffset, true))) * 255)
             ], 0);
 
-            r0 =  input[(prop['rot_0'].offset/4) + floatOffset];
-            r1 =  input[(prop['rot_1'].offset/4) + floatOffset];
-            r2 =  input[(prop['rot_2'].offset/4) + floatOffset];
-            r3 =  input[(prop['rot_3'].offset/4) + floatOffset];
+            r0 =  dataView.getFloat32(prop['rot_0'].offset + i*rowOffset, true);
+            r1 =  dataView.getFloat32(prop['rot_1'].offset + i*rowOffset, true);
+            r2 =  dataView.getFloat32(prop['rot_2'].offset + i*rowOffset, true);
+            r3 =  dataView.getFloat32(prop['rot_3'].offset + i*rowOffset, true);
 
             q = new Quaternion(r1, r2, r3, r0);
 
@@ -645,57 +647,57 @@ class PLYLoader {
             ], 0);
 
             sh.set([
-                input[(prop['f_dc_0'].offset / 4) + floatOffset],
-                input[(prop['f_dc_1'].offset / 4) + floatOffset],
-                input[(prop['f_dc_2'].offset / 4) + floatOffset]
+                dataView.getFloat32(prop['f_dc_0'].offset+ i*rowOffset, true),
+                dataView.getFloat32(prop['f_dc_1'].offset+ i*rowOffset, true),
+                dataView.getFloat32(prop['f_dc_2'].offset+ i*rowOffset, true)
             ], 0);
 
             sh.set([
-                input[(prop[`f_rest_0`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_15`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_30`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_1`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_16`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_31`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_2`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_17`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_32`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_3`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_18`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_33`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_4`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_19`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_34`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_5`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_20`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_35`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_6`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_21`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_36`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_7`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_22`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_37`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_8`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_23`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_38`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_9`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_24`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_38`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_10`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_25`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_40`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_11`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_26`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_41`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_12`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_27`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_42`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_13`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_28`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_43`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_14`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_29`].offset / 4) + floatOffset],
-                input[(prop[`f_rest_44`].offset / 4) + floatOffset],
+                dataView.getFloat32(prop[`f_rest_0`].offset + i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_15`].offset +i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_30`].offset +i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_1`].offset + i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_16`].offset +i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_31`].offset +i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_2`].offset + i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_17`].offset +i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_32`].offset +i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_3`].offset + i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_18`].offset +i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_33`].offset +i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_4`].offset + i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_19`].offset +i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_34`].offset +i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_5`].offset + i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_20`].offset +i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_35`].offset +i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_6`].offset + i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_21`].offset +i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_36`].offset +i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_7`].offset + i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_22`].offset +i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_37`].offset +i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_8`].offset + i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_23`].offset +i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_38`].offset +i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_9`].offset + i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_24`].offset +i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_38`].offset +i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_10`].offset +i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_25`].offset +i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_40`].offset +i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_11`].offset +i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_26`].offset +i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_41`].offset +i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_12`].offset +i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_27`].offset +i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_42`].offset +i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_13`].offset +i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_28`].offset +i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_43`].offset +i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_14`].offset +i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_29`].offset +i*rowOffset, true),
+                dataView.getFloat32(prop[`f_rest_44`].offset +i*rowOffset, true),
             ], 3);
             // for(let j = 0; j < 45; j ++) {
             //     const index = 3 + ((j % 15)*3 + Math.floor(j / 15));

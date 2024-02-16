@@ -46,7 +46,7 @@ function updateBar() {
     }
 }
 
-const quantized = true;
+const quantized = false;
 
 async function loadFile(file: File) {
     if (loading) return;
@@ -90,13 +90,10 @@ async function loadFileUrl(url: string) {
 }
 
 function updateProgress(progress : number, loadingDone: boolean = false) : void {
-
     barProgress = progress;
     if(loadingDone) {
         barDesc = "Parsing";
-
     }
-
 }
 
 function endProgress() : void {
@@ -159,7 +156,7 @@ async function main() {
         // Load a placeholder scene
     const url = "https://huggingface.co/datasets/dylanebert/3dgs/resolve/main/bonsai/point_cloud/iteration_7000/point_cloud.ply";
     // const url = "https://huggingface.co/datasets/dylanebert/3dgs/resolve/main/bicycle/point_cloud/iteration_7000/point_cloud.ply";
-    // loadFileUrl(url);
+    loadFileUrl(url);
 
     // Render loop
     const frame = () => {
