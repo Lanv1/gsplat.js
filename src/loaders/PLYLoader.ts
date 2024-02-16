@@ -67,7 +67,7 @@ class PLYLoader {
         console.log(`File loaded in ${loadTime}ms.`);
         
         onProgress?.(1, true);
-        await new Promise(resolve => setTimeout(resolve, 20));   //sketchy but only way i found to let html update between loading and parsing
+        await new Promise(resolve => setTimeout(resolve, 100));   //sketchy but only way i found to let html update between loading and parsing
 
         if (plyData[0] !== 112 || plyData[1] !== 108 || plyData[2] !== 121 || plyData[3] !== 10) {
             throw new Error("Invalid PLY file");
@@ -85,7 +85,8 @@ class PLYLoader {
                 scene.bandsIndices = rawData[2]; //Indices of last gaussians having 0, 1 or 2 bands activated
                 // scene.g0bands= rawData[2]; //Nb of vertices having 0 bands.
             } else {
-                rawData = this._ParseFullPLYBuffer(plyData.buffer, format);
+                const plyHeader = this._parsePLYHeader(plyData.buffer, format);
+                rawData = this._ParseFullPLYBufferFast(plyHeader, plyData.buffer);
             }
             let after = performance.now();
 
@@ -1009,9 +1010,6 @@ class PLYLoader {
             for(let i = 0; i < 256; i ++) {     
                 const encoded  = cbDataView.getInt16((i*nbCodeBooks*2) + (j*2), true);
                 cb[j].data[i] = decodeFloat16(new Int16Array([encoded]), 0, 1)[0];
-
-                // cb[j].data[i] = cbDataView.getInt16((i*nbCodeBooks*2) + (j*2), true);
-
             }
         }
 
@@ -1023,13 +1021,14 @@ class PLYLoader {
         const dataBuffer = new ArrayBuffer(Scene.RowLength * totalVertexCount);
         const shsBuffer = new ArrayBuffer(shRowLength * (vertexCounts[1] + vertexCounts[2] + vertexCounts[3]));
 
-        console.log(`sh texture of size ${vertexCounts[3]} * ${shRowLength}`);
+        // console.log(`sh texture of size ${vertexCounts[3]} * ${shRowLength} bytes`);
 
 
         let after = performance.now();
-        console.log(`setting codebook, preparing for fetching data took ${after - before}ms.`);
+        console.log(`setting codebook, preparing for data fetching took ${after - before}ms.`);
 
 
+        // create a dictionnary from the properties in header
         const props = []
         for(let i = 0; i < 4; i ++) {
             const prop: Record<string, PlyProperty> = properties[i].reduce((acc: Record<string, PlyProperty>, item: PlyProperty) => {
@@ -1049,22 +1048,21 @@ class PLYLoader {
 
         const shStrideLut = [3, 8, 15];
         let shStride = 0;
+        const sh0offset= props[1]["f_rest_0"].offset
         for(let i = 0; i < 4; i ++) {
             before = performance.now();
 
-
             const vertexCount : number  = vertexCounts[i];
-            // const prop : PlyProperty[] = properties[i];
-
             const prop = props[i];
-            // const rowOffsetWrite = rowOffsetsWrite[i];
             const rowOffsetRead = rowOffsetsRead[i];
-
+            
             if(i > 0){
                 shLength = shRowLength;
                 shStride = shStrideLut[i-1];
             } 
 
+            // console.log(cb)
+            // console.log(prop)
             const sh_prop = properties[i].filter((p) => p.name.startsWith("f_rest"));
 
             for(let v = 0; v < vertexCount; v ++) {
@@ -1075,20 +1073,9 @@ class PLYLoader {
                 const sh = new Float32Array(shsBuffer, shOffset + v * shLength, shLength/4);
 
                 let r = [255, 0, 0, 0];
-                
+                let index, indexInCb, h;
+
                 // POSITION
-                // const pX = prop['x'];
-                // let h = valDataView.getInt16(readOffset + pX.offset + v * rowOffsetRead, true);
-                // position[0] = decodeFloat16(new Int16Array([h]), 0, 1)[0];
-                
-                // const pY = prop['y'];
-                // h = valDataView.getInt16(readOffset + pY.offset + v * rowOffsetRead, true);
-                // position[1] = decodeFloat16(new Int16Array([h]), 0, 1)[0];
-
-                // const pZ = prop['z'];
-                // h = valDataView.getInt16(readOffset + pZ.offset + v * rowOffsetRead, true);
-                // position[2] = decodeFloat16(new Int16Array([h]), 0, 1)[0];
-
                 position.set([
                     decodeFloat16(new Int16Array([
                         valDataView.getInt16(readOffset + prop['x'].offset + v * rowOffsetRead, true)
@@ -1101,19 +1088,16 @@ class PLYLoader {
                     ]), 0, 1)[0],
                 ], 0);
 
-                let index, indexInCb, h;
-
+                
                 // SCALING
-                for(let j = 0; j < 3; j ++) {
-                    const pScale = prop[`scale_${j}`];
-                    index = valDataView.getUint8(readOffset + pScale.offset + v * rowOffsetRead);
-                    indexInCb = cbIndex["scaling"];
-                    h = cb[indexInCb].data[index];
-                    // value = decodeFloat16(new Int16Array([h]), 0, 1)[0];
-                    scale[j] = Math.exp(h);
-                }
+                index = cbIndex["scaling"]
+                scale.set([
+                    Math.exp(cb[index].data[valDataView.getUint8(readOffset + prop["scale_0"].offset + v * rowOffsetRead)]),
+                    Math.exp(cb[index].data[valDataView.getUint8(readOffset + prop["scale_1"].offset + v * rowOffsetRead)]),
+                    Math.exp(cb[index].data[valDataView.getUint8(readOffset + prop["scale_2"].offset + v * rowOffsetRead)]),
+                ], 0);
 
-                //ROTATION
+                // ROTATION
                 const pRotRe = prop["rot_0"];
                 index = valDataView.getUint8(readOffset + pRotRe.offset + v * rowOffsetRead);
                 indexInCb = cbIndex["rotation_re"];
@@ -1130,57 +1114,62 @@ class PLYLoader {
                     r[j] = h;
                 }
 
-                // DIFFUSE COMPONENT (RGBA + FILL SH COEFFS IF LAST POINTCLOUD)
-                for(let j = 0; j < 3; j ++) {
-                    const pCol = prop[`f_dc_${j}`];
-                    index = valDataView.getUint8(readOffset + pCol.offset + v * rowOffsetRead);
-                    indexInCb = cbIndex["features_dc"];
-                    h = cb[indexInCb].data[index];
-                    // value = decodeFloat16(new Int16Array([h]), 0, 1)[0];
-                    rgba[j] = (0.5 + SH_C0* h) * 255;
-                    
-                    if(i > 0) sh[j] = h;
-                }
+                let q = new Quaternion(r[1], r[2], r[3], r[0]);
+                q = q.normalize();
 
-                const pOpacity =  prop["opacity"];
-                index = valDataView.getUint8(readOffset + pOpacity.offset + v * rowOffsetRead);
-                indexInCb = cbIndex["opacity"];
-                h = cb[indexInCb].data[index];
-                // value = decodeFloat16(new Int16Array([h]), 0, 1)[0];
-                rgba[3] = (1 / (1 + Math.exp(-h))) * 255;
+                rot.set([
+                    q.w* 128 + 128,
+                    q.x* 128 + 128,
+                    q.y* 128 + 128,
+                    q.z* 128 + 128
+                ], 0);
+
+
+                // RGBA 
+                rgba.set([
+                    (0.5 + SH_C0 * cb[cbIndex["features_dc"]].data[
+                        valDataView.getUint8(readOffset + prop["f_dc_0"].offset + v * rowOffsetRead)
+                    ]) * 255,
+                    (0.5 + SH_C0 * cb[cbIndex["features_dc"]].data[
+                        valDataView.getUint8(readOffset + prop["f_dc_1"].offset + v * rowOffsetRead)
+                    ]) * 255,
+                    (0.5 + SH_C0 * cb[cbIndex["features_dc"]].data[
+                        valDataView.getUint8(readOffset + prop["f_dc_2"].offset + v * rowOffsetRead)
+                    ]) * 255,
+                    (1 / (1 + Math.exp( -cb[cbIndex["opacity"]].data[
+                        valDataView.getUint8(readOffset + prop["opacity"].offset + v * rowOffsetRead)
+                    ]))) * 255,
+                ], 0);
+
 
                 //SPHERICAL HARMONICS
-                for(const p of sh_prop) {
-                    const n44 = parseInt(p.name.split("_").slice(-1)[0]);
-                    const n14 = n44 % shStride;
-                    
-                    index = valDataView.getUint8(readOffset + p.offset + v * rowOffsetRead);
+                if(i > 0) {
 
-                    indexInCb = cbIndex[`features_rest_${n14}`];
-                    h = cb[indexInCb].data[index];
+                    // Diffuse components
+                    sh.set([
+                        cb[cbIndex["features_dc"]].data[
+                            valDataView.getUint8(readOffset + prop["f_dc_0"].offset + v * rowOffsetRead)
+                        ],
+                        cb[cbIndex["features_dc"]].data[
+                            valDataView.getUint8(readOffset + prop["f_dc_1"].offset + v * rowOffsetRead)
+                        ],
+                        cb[cbIndex["features_dc"]].data[
+                            valDataView.getUint8(readOffset + prop["f_dc_2"].offset + v * rowOffsetRead)
+                        ],
+                    ], 0);
 
-                    const shIndex =  3 + ((n44 % shStride)*3 + Math.floor(n44 / shStride));
-                    // value = decodeFloat16(new Int16Array([h]), 0, 1)[0];
-
-                    // if(v == 0) testArr[3+n44] = coeff;
-                    // console.log(``)
-                    sh[shIndex] = h;
+                    // Higher bands (max 3 bands enabled)
+                    sh.set(sh_prop.map((p : PlyProperty, mapIndex: number) : number => {                        
+                        const n14 = Math.floor(mapIndex / 3);
+                        const currentShOffset = sh0offset + (n14 + shStride*(mapIndex % 3));
+                        index = valDataView.getUint8(readOffset + currentShOffset + v * rowOffsetRead);
+                        
+                        indexInCb = cbIndex[`features_rest_${n14}`];
+                        return cb[indexInCb].data[index]
+                    }), 3);
                 }
 
-
-                    let q = new Quaternion(r[1], r[2], r[3], r[0]);
-
-                    q = q.normalize();
-                    rot[0] = q.w * 128 + 128;
-                    rot[1] = q.x * 128 + 128;
-                    rot[2] = q.y * 128 + 128;
-                    rot[3] = q.z * 128 + 128;
-
-                    // console.log(`vertex ${v} Scales ${scale}`);
-                    // console.log(`vertex ${v} Pos ${position}`);
-                    // console.log(`vertex ${v} rotation ${rot}`);
-                    // console.log(`vertex ${v} opacity ${rgba[3]}`);
-                }
+            }
 
             after = performance.now();
             console.log(`parsing ${vertexCount} vertices took ${after - before}ms.`);

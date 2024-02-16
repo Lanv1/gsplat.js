@@ -25,23 +25,28 @@ let barProgress = 0
 
 let useShs = true;
 let parseElemCreated = false;
+let parseElem : HTMLElement;
 
 function updateBar() {
     (loadingDesc as HTMLElement).textContent = `${barDesc} ${barProgress.toFixed(2)}`;
+
     if(barDesc == "Parsing" && !parseElemCreated) {
         (progressElem as HTMLElement).style.opacity = "0.";
+        loadingElem?.removeChild(progressElem as HTMLProgressElement);
+
         parseElemCreated = true;
-        const parse_elem = document.createElement('i');
-        parse_elem.classList.add("fa-solid");
-        parse_elem.classList.add("fa-spinner");
-        parse_elem.style.transform = "rotate(0)" ;
-        parse_elem.style.transition= "all 1.5s";
-        loadingElem?.appendChild(parse_elem);
+        parseElem = document.createElement('i');
+        parseElem.classList.add("fa-solid");
+        parseElem.classList.add("fa-spinner");
+        parseElem.classList.add("rotate-icon");
+        loadingElem?.appendChild(parseElem);
     } else {
 
         (progressElem as HTMLProgressElement).value = 100 * barProgress;
     }
 }
+
+const quantized = true;
 
 async function loadFile(file: File) {
     if (loading) return;
@@ -58,7 +63,7 @@ async function loadFile(file: File) {
         updateProgress,
         format,
         useShs,
-        false    // flag to use quantized parser or not
+        quantized    // flag to use quantized parser or not
     ).then(endProgress);
         
     loading = false;
@@ -79,7 +84,7 @@ async function loadFileUrl(url: string) {
         updateProgress,
         format,
         useShs,
-        false    // flag to use quantized parser or not
+        quantized    // flag to use quantized parser or not
     ).then(endProgress);
         
 }
@@ -99,6 +104,9 @@ function endProgress() : void {
     (canvasElem as HTMLElement).style.opacity = "1";
     barDesc = "Loading";
     loading = false;
+    loadingElem?.appendChild(progressElem as HTMLProgressElement);
+    loadingElem?.removeChild(parseElem);
+    parseElemCreated = false;
 }
 
 
@@ -150,7 +158,8 @@ async function main() {
 
         // Load a placeholder scene
     const url = "https://huggingface.co/datasets/dylanebert/3dgs/resolve/main/bonsai/point_cloud/iteration_7000/point_cloud.ply";
-    loadFileUrl(url);
+    // const url = "https://huggingface.co/datasets/dylanebert/3dgs/resolve/main/bicycle/point_cloud/iteration_7000/point_cloud.ply";
+    // loadFileUrl(url);
 
     // Render loop
     const frame = () => {
