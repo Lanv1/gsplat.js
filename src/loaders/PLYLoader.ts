@@ -583,7 +583,7 @@ class PLYLoader {
 
         const dataView = new DataView(inputBuffer, header.size);
 
-        const input = new Float32Array(inputBuffer, header.size);   // since we're treating everything as a float32 there is no need for a dataview
+        // const input = new Float32Array(inputBuffer, header.size);   // since we're treating everything as a float32 there is no need for a dataview
         const dataBuffer = new ArrayBuffer(Scene.RowLength * header.vertexCount);
         const shsBuffer = new ArrayBuffer(shRowLength * header.vertexCount);
 
